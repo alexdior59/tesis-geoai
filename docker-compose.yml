@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  geoai:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/input:/geoai/data/input
+      - ./data/results:/geoai/data/results
+    environment:
+      - PYTHONUNBUFFERED=1
+    # TODO: revisar si necesitamos ponerle restart: always
