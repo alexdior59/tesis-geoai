@@ -25,7 +25,7 @@ _jobs_lock = threading.Lock()
 UPLOAD_DIR = Path(tempfile.gettempdir()) / "geoai_uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-MAX_FILE_MB = 500
+MAX_FILE_MB = 2000
 
 
 # ------------------------------------------------------------------

@@ -1,8 +1,8 @@
 import numpy as np
 from dataclasses import dataclass
-from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import MiniBatchKMeans, DBSCAN
 
 
 @dataclass
@@ -80,9 +80,12 @@ class SpatialSegmenter:
             features=features,
             prefix="zona",
         )
+
+        dbscan_features = features[dbscan_indices] if features.shape[0] > 200_000 else features
+
         dbscan_zones = self._build_zones(
             labels=dbscan_labels,
-            features=features,
+            features=dbscan_features,
             prefix="patron",
             include_noise=True,
         )
@@ -108,11 +111,12 @@ class SpatialSegmenter:
         )
 
     def _run_kmeans(self, features_scaled):
-        model = KMeans(
+        model = MiniBatchKMeans(
             n_clusters=self.kmeans_k,
             init="k-means++",
-            n_init=10,
-            max_iter=300,
+            n_init=3,
+            max_iter=100,
+            batch_size=10000,
             random_state=self.random_state,
         )
         return model.fit_predict(features_scaled)

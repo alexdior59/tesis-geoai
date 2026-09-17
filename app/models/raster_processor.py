@@ -58,7 +58,7 @@ class RasterProcessor:
             raise ValueError("Ojo, tiene que ser un archivo .tif o .tiff")
 
     def process(self):
-        # print(f"Procesando imagen: {self.path}") # TODO: quitar prints de debug despues
+        # print(f"Procesando imagen: {self.path}") # TODO: quitar prints de debug
         with rasterio.open(self.path) as ds:
             self._validate(ds)
             metadata = self._extract_metadata(ds)
