@@ -3,6 +3,7 @@ import rasterio
 from rasterio.crs import CRS
 from dataclasses import dataclass, field
 from pathlib import Path
+from rasterio.transform import xy
 
 
 # Índice de banda
@@ -34,10 +35,12 @@ class RasterMetadata:
 @dataclass
 class ProcessedRaster:
     ndvi: np.ndarray
-    savi: np.ndarray
+    ndre: np.ndarray
     gndvi: np.ndarray
     valid_mask: np.ndarray
     feature_stack: np.ndarray
+    spatial_coords: np.ndarray
+    transform: rasterio.Affine
     metadata: RasterMetadata
     band_stats: dict = field(default_factory=dict)
 
@@ -58,25 +61,26 @@ class RasterProcessor:
             raise ValueError("Ojo, tiene que ser un archivo .tif o .tiff")
 
     def process(self):
-        # print(f"Procesando imagen: {self.path}") # TODO: quitar prints de debug
         with rasterio.open(self.path) as ds:
             self._validate(ds)
             metadata = self._extract_metadata(ds)
-            # print("Metadatos extraidos bien")
+            transform = ds.transform
             bands = self._load_bands(ds)
 
         indices = self._calculate_indices(bands)
         valid_mask = self._build_valid_mask(bands, indices)
         feature_stack = self._build_feature_stack(indices, valid_mask)
+        spatial_coords = self._extract_coordinates(valid_mask, transform)  # Extraemos X, Y
         band_stats = self._compute_stats(indices, valid_mask)
-        # print("Pipeline de indices terminado")
 
         return ProcessedRaster(
             ndvi=indices["ndvi"],
-            savi=indices["savi"],
+            ndre=indices["ndre"],
             gndvi=indices["gndvi"],
             valid_mask=valid_mask,
             feature_stack=feature_stack,
+            spatial_coords=spatial_coords,
+            transform=transform,
             metadata=metadata,
             band_stats=band_stats,
         )
@@ -137,16 +141,12 @@ class RasterProcessor:
         nir = bands["nir"]
         red = bands["red"]
         green = bands["green"]
+        rededge = bands["rededge"]
 
-        # TODO: revisar si L=0.5 es el mejor para los lotes, por ahora lo dejamos asi
         ndvi = self._safe_ratio(nir - red, nir + red)
-        savi = self._safe_ratio(
-            (nir - red) * (1 + self.SAVI_L),
-            nir + red + self.SAVI_L
-        )
+        ndre = self._safe_ratio(nir - rededge, nir + rededge)
         gndvi = self._safe_ratio(nir - green, nir + green)
-
-        return {"ndvi": ndvi, "savi": savi, "gndvi": gndvi}
+        return {"ndvi": ndvi, "ndre": ndre, "gndvi": gndvi}
 
     @staticmethod
     def _safe_ratio(numerator, denominator):
@@ -173,10 +173,15 @@ class RasterProcessor:
     def _build_feature_stack(self, indices, valid_mask):
         features = np.stack([
             indices["ndvi"][valid_mask],
-            indices["savi"][valid_mask],
+            indices["ndre"][valid_mask],
             indices["gndvi"][valid_mask],
         ], axis=1)
         return features.astype(np.float32)
+
+    def _extract_coordinates(self, valid_mask, transform):
+        rows, cols = np.where(valid_mask)
+        xs, ys = xy(transform, rows, cols)
+        return np.column_stack((xs, ys)).astype(np.float32)
 
     def _compute_stats(self, indices, valid_mask):
         stats = {}

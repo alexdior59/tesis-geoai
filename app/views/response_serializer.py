@@ -2,6 +2,9 @@ import json
 import uuid
 from datetime import datetime, timezone
 from dataclasses import asdict
+from rasterio.features import shapes
+import shapely.geometry
+from shapely.geometry import shape, mapping
 
 import numpy as np
 
@@ -77,48 +80,35 @@ class ResponseSerializer:
         }
 
     def to_geojson(self):
-        """
-        Arma el GeoJSON para poder pintarlo en QGIS.
-        """
         m = self.processed.metadata
-        features = []
+        transform = self.processed.transform
+        valid_mask = self.processed.valid_mask
 
-        for zone in self.result.kmeans_zones:
-            bbox = self._estimate_bbox(zone, m)
+        matriz_etiquetas = np.full(valid_mask.shape, -1, dtype=np.int16)
+        matriz_etiquetas[valid_mask] = self.result.kmeans_labels
+
+        features = []
+        for geom, val in shapes(matriz_etiquetas, mask=valid_mask, transform=transform):
+            cluster_id = int(val)
+            if cluster_id == -1: continue
+
+            zone_data = next((z for z in self.result.kmeans_zones if z.cluster_id == cluster_id), None)
+            if not zone_data: continue
 
             feature = {
                 "type": "Feature",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [bbox],
-                },
+                "geometry": mapping(shape(geom).simplify(0.5, preserve_topology=True)),
                 "properties": {
-                    "cluster_id": zone.cluster_id,
-                    "label": zone.label,
-                    "area_ha": zone.area_ha,
-                    "pixel_count": zone.pixel_count,
-                    "ndvi_mean": zone.ndvi_mean,
-                    "ndvi_std": zone.ndvi_std,
-                    "savi_mean": zone.savi_mean,
-                    "gndvi_mean": zone.gndvi_mean,
-                    "crs": m.crs,
-                    "job_id": self.job_id,
+                    "cluster_id": zone_data.cluster_id,
+                    "label": zone_data.label,
+                    "ndre_mean": zone_data.ndre_mean,
                 },
             }
             features.append(feature)
 
         return {
             "type": "FeatureCollection",
-            "crs": {
-                "type": "name",
-                "properties": {"name": m.crs},
-            },
-            "metadata": {
-                "job_id": self.job_id,
-                "timestamp_utc": self.timestamp,
-                "source_file": self.source_file,
-                "total_zones": len(features),
-            },
+            "crs": {"type": "name", "properties": {"name": m.crs}},
             "features": features,
         }
 
@@ -182,7 +172,7 @@ class ResponseSerializer:
             "area_ha": zone.area_ha,
             "ndvi_mean": zone.ndvi_mean,
             "ndvi_std": zone.ndvi_std,
-            "savi_mean": zone.savi_mean,
+            "ndre_mean": zone.ndre_mean,
             "gndvi_mean": zone.gndvi_mean,
             "is_noise": zone.is_noise,
         }

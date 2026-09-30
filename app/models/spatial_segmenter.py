@@ -15,6 +15,9 @@ class ClusterZone:
     ndvi_std: float
     savi_mean: float
     gndvi_mean: float
+    ndvi_std: float
+    ndre_mean: float
+    gndvi_mean: float
     is_noise: bool = False
 
 
@@ -54,6 +57,7 @@ class SpatialSegmenter:
 
     def segment(self, processed):
         features = processed.feature_stack
+        coords = processed.spatial_coords
 
         if features.shape[0] < self.kmeans_k:
             raise ValueError(
@@ -65,11 +69,13 @@ class SpatialSegmenter:
         features_scaled = scaler.fit_transform(features)
 
         # 1. K-Means
-        kmeans_labels = self._run_kmeans(features_scaled)
+        kmeans_model = MiniBatchKMeans(n_clusters=self.kmeans_k, random_state=self.random_state)
+        kmeans_labels = kmeans_model.fit_predict(features_scaled)
 
         # 2. DBSCAN
-        # TODO: A veces el eps es muy sensible, revisar si lo volvemos un parametro dinamico despues
-        dbscan_labels, dbscan_indices = self._run_dbscan(features_scaled)
+        dbscan_labels, dbscan_indices = self._run_dbscan(
+            features_scaled, coords, kmeans_labels, kmeans_model
+        )
 
         # 3. Métricas
         metrics = self._compute_metrics(features_scaled, kmeans_labels, dbscan_labels)
@@ -121,19 +127,14 @@ class SpatialSegmenter:
         )
         return model.fit_predict(features_scaled)
 
-    def _run_dbscan(self, features_scaled):
-        MAX_PIXELS = 200_000
-        n = features_scaled.shape[0]
+    def _run_dbscan(self, features_scaled, spatial_coords, kmeans_labels, kmeans_model):
+        centros = kmeans_model.cluster_centers_
+        distancias = np.linalg.norm(features_scaled - centros[kmeans_labels], axis=1)
 
-        if n <= MAX_PIXELS:
-            indices = np.arange(n)
-            sample = features_scaled
-        else:
-            rng = np.random.default_rng(self.random_state)
-            indices = rng.choice(n, size=MAX_PIXELS, replace=False)
-            indices.sort()
-            sample = features_scaled[indices]
-            print(f"dataset muy grande ({n} px). Subsample a 200k")
+        umbral_distancia = np.percentile(distancias, 95)
+        indices_atipicos = np.where(distancias > umbral_distancia)[0]
+
+        coords_atipicas = spatial_coords[indices_atipicos]
 
         model = DBSCAN(
             eps=self.dbscan_eps,
@@ -141,8 +142,12 @@ class SpatialSegmenter:
             algorithm="ball_tree",
             n_jobs=-1,
         )
-        labels = model.fit_predict(sample)
-        return labels, indices
+        labels_atipicos = model.fit_predict(coords_atipicas)
+
+        labels_completos = np.full(features_scaled.shape[0], -2)  # -2 = Normal (Ignorado por DBSCAN)
+        labels_completos[indices_atipicos] = labels_atipicos
+
+        return labels_completos, indices_atipicos
 
     def _compute_metrics(self, features_scaled, kmeans_labels, dbscan_labels):
         metrics = {}
