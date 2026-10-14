@@ -3,10 +3,7 @@ import rasterio
 from rasterio.crs import CRS
 from dataclasses import dataclass, field
 from pathlib import Path
-from rasterio.transform import xy
 
-
-# Índice de banda
 BAND_INDEX = {
     "blue":     1,
     "green":    2,
@@ -16,7 +13,6 @@ BAND_INDEX = {
 }
 
 EXPECTED_CRS = "EPSG:32618"
-
 
 @dataclass
 class RasterMetadata:
@@ -31,7 +27,6 @@ class RasterMetadata:
     source_software: str
     capture_datetime: str
 
-
 @dataclass
 class ProcessedRaster:
     ndvi: np.ndarray
@@ -44,13 +39,10 @@ class ProcessedRaster:
     metadata: RasterMetadata
     band_stats: dict = field(default_factory=dict)
 
-
 class RasterProcessor:
     """
     Clase para procesar la imagen, sacar metadatos y calcular los indices.
     """
-
-    SAVI_L = 0.5
     VEGETATION_THRESHOLD = 0.1
 
     def __init__(self, tif_path):
@@ -70,7 +62,7 @@ class RasterProcessor:
         indices = self._calculate_indices(bands)
         valid_mask = self._build_valid_mask(bands, indices)
         feature_stack = self._build_feature_stack(indices, valid_mask)
-        spatial_coords = self._extract_coordinates(valid_mask, transform)  # Extraemos X, Y
+        spatial_coords = self._extract_coordinates(valid_mask, transform)
         band_stats = self._compute_stats(indices, valid_mask)
 
         return ProcessedRaster(
@@ -102,7 +94,6 @@ class RasterProcessor:
         b = ds.bounds
         area_m2 = (b.right - b.left) * (b.top - b.bottom)
         tags = ds.tags()
-
         return RasterMetadata(
             crs=str(ds.crs),
             resolution_m=round(res_x, 4),
@@ -125,16 +116,11 @@ class RasterProcessor:
         raw = {}
         for name, idx in BAND_INDEX.items():
             data = ds.read(idx).astype(np.float32)
-
-            # quitar valores nulos
             if ds.nodata is not None:
                 data[data == ds.nodata] = np.nan
-
             if np.nanmax(data) > 1.0:
                 data = data / 65535.0
-
             raw[name] = data
-
         return raw
 
     def _calculate_indices(self, bands):
@@ -142,7 +128,6 @@ class RasterProcessor:
         red = bands["red"]
         green = bands["green"]
         rededge = bands["rededge"]
-
         ndvi = self._safe_ratio(nir - red, nir + red)
         ndre = self._safe_ratio(nir - rededge, nir + rededge)
         gndvi = self._safe_ratio(nir - green, nir + green)
@@ -160,13 +145,10 @@ class RasterProcessor:
 
     def _build_valid_mask(self, bands, indices):
         mask = np.ones(bands["nir"].shape, dtype=bool)
-
         for arr in bands.values():
             mask &= ~np.isnan(arr)
         for arr in indices.values():
             mask &= ~np.isnan(arr)
-
-        # Filtramos lo que no sea planta para no procesar ruido de tierra/agua
         mask &= (indices["ndvi"] >= self.VEGETATION_THRESHOLD)
         return mask
 
@@ -179,8 +161,13 @@ class RasterProcessor:
         return features.astype(np.float32)
 
     def _extract_coordinates(self, valid_mask, transform):
+        """
+        Calcula coordenadas relativas en metros (X, Y) de forma vectorizada.
+        Restamos el origen (transform.c, transform.f) para mantener precision submilimetrica en float32.
+        """
         rows, cols = np.where(valid_mask)
-        xs, ys = xy(transform, rows, cols)
+        xs = (cols.astype(np.float32) + 0.5) * float(transform.a)
+        ys = (rows.astype(np.float32) + 0.5) * float(transform.e)
         return np.column_stack((xs, ys)).astype(np.float32)
 
     def _compute_stats(self, indices, valid_mask):

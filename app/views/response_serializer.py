@@ -1,19 +1,14 @@
 import json
 import uuid
 from datetime import datetime, timezone
-from dataclasses import asdict
-from rasterio.features import shapes
-import shapely.geometry
+from rasterio.features import shapes, sieve
 from shapely.geometry import shape, mapping
-
 import numpy as np
-
 
 class ResponseSerializer:
     """
     Clase para convertir el resultado de la segmentacion a JSON o GeoJSON.
     """
-
     API_VERSION = "1.0.0"
 
     def __init__(self, processed, result, source_file=""):
@@ -27,14 +22,11 @@ class ResponseSerializer:
         """Arma el JSON principal que va a devolver la API."""
         m = self.processed.metadata
         r = self.result
-
         return {
             "job_id": self.job_id,
             "api_version": self.API_VERSION,
             "timestamp_utc": self.timestamp,
             "status": "completed",
-
-            # TODO: Asegurar que estos metadatos cuadren con el inventario de datos del excel
             "data_provenance": {
                 "source_file": self.source_file,
                 "crs": m.crs,
@@ -45,9 +37,7 @@ class ResponseSerializer:
                 "source_software": m.source_software,
                 "capture_datetime": m.capture_datetime,
             },
-
             "analysis_params": r.params,
-
             "quality_metrics": {
                 "kmeans": {
                     "silhouette_score": r.metrics.get("kmeans_silhouette"),
@@ -64,13 +54,9 @@ class ResponseSerializer:
                     "silhouette_score": r.metrics.get("dbscan_silhouette"),
                 },
             },
-
             "vegetation_indices": self.processed.band_stats,
-
             "kmeans_zones": [self._zone_to_dict(z) for z in r.kmeans_zones],
-
             "dbscan_patterns": [self._zone_to_dict(z) for z in r.dbscan_zones],
-
             "disclaimer": (
                 "Los resultados identifican patrones espectrales mediante "
                 "clustering no supervisado. No constituyen un diagnostico "
@@ -87,21 +73,28 @@ class ResponseSerializer:
         matriz_etiquetas = np.full(valid_mask.shape, -1, dtype=np.int16)
         matriz_etiquetas[valid_mask] = self.result.kmeans_labels
 
-        features = []
-        for geom, val in shapes(matriz_etiquetas, mask=valid_mask, transform=transform):
-            cluster_id = int(val)
-            if cluster_id == -1: continue
+        # Filtramos micro-parches menores a 100 pixeles (~0.3 m2) para evitar explosion de poligonos
+        matriz_limpia = sieve(matriz_etiquetas, size=100)
 
+        features = []
+        for geom, val in shapes(matriz_limpia, mask=valid_mask, transform=transform):
+            cluster_id = int(val)
+            if cluster_id == -1:
+                continue
             zone_data = next((z for z in self.result.kmeans_zones if z.cluster_id == cluster_id), None)
-            if not zone_data: continue
+            if not zone_data:
+                continue
 
             feature = {
                 "type": "Feature",
-                "geometry": mapping(shape(geom).simplify(0.5, preserve_topology=True)),
+                "geometry": mapping(shape(geom).simplify(0.2, preserve_topology=True)),
                 "properties": {
                     "cluster_id": zone_data.cluster_id,
                     "label": zone_data.label,
+                    "area_ha": zone_data.area_ha,
+                    "ndvi_mean": zone_data.ndvi_mean,
                     "ndre_mean": zone_data.ndre_mean,
+                    "gndvi_mean": zone_data.gndvi_mean,
                 },
             }
             features.append(feature)
@@ -127,7 +120,7 @@ class ResponseSerializer:
             f"Area total   : {m.area_ha} ha",
             f"Pixeles val. : {r.params.get('n_valid_pixels', '?'):,}",
             "",
-            "--- K-MEANS ---",
+            "--- MACRO-ZONIFICACION (FCM) ---",
             f"Clusters     : {r.metrics.get('kmeans_n_clusters')}",
             f"Silhouette   : {r.metrics.get('kmeans_silhouette')}  "
             f"({self._interpret_silhouette(r.metrics.get('kmeans_silhouette'))})",
@@ -136,11 +129,11 @@ class ResponseSerializer:
         for z in r.kmeans_zones:
             lines.append(
                 f"  [{z.cluster_id}] {z.label:<40} "
-                f"{z.area_ha:>7.4f} ha  NDVI={z.ndvi_mean:.3f}"
+                f"{z.area_ha:>7.4f} ha  NDVI={z.ndvi_mean:.3f}  NDRE={z.ndre_mean:.3f}"
             )
         lines += [
             "",
-            "--- DBSCAN ---",
+            "--- ANOMALIAS ESPACIALES (DBSCAN) ---",
             f"Patrones     : {r.metrics.get('dbscan_n_clusters')}",
             f"Ruido        : {r.metrics.get('dbscan_noise_pct')}%",
         ]
@@ -148,7 +141,7 @@ class ResponseSerializer:
             tag = " [RUIDO]" if z.is_noise else ""
             lines.append(
                 f"  [{z.cluster_id}] {z.label:<40} "
-                f"{z.pixel_count:>8,} px  NDVI={z.ndvi_mean:.3f}{tag}"
+                f"{z.pixel_count:>8,} px  NDVI={z.ndvi_mean:.3f}  NDRE={z.ndre_mean:.3f}{tag}"
             )
         lines += ["", "=" * 60]
         return "\n".join(lines)
@@ -188,26 +181,6 @@ class ResponseSerializer:
         if score >= 0.25:
             return "estructura debil"
         return "sin estructura clara"
-
-    @staticmethod
-    def _estimate_bbox(zone, metadata):
-        # FIXME: Esto saca un cuadrado proporcional, no el poligono real. Luego hay que meterle rasterio.features.shapes para sacar el borde exacto
-        b = metadata.bounds
-        total_px = metadata.width_px * metadata.height_px
-        ratio = zone.pixel_count / max(total_px, 1)
-
-        left = b["left"]
-        bottom = b["bottom"]
-        width = (b["right"] - b["left"]) * ratio
-        height = (b["top"] - b["bottom"]) * ratio
-
-        return [
-            [left, bottom],
-            [left + width, bottom],
-            [left + width, bottom + height],
-            [left, bottom + height],
-            [left, bottom],
-        ]
 
     @staticmethod
     def _json_default(obj):
