@@ -4,12 +4,13 @@ from rasterio.crs import CRS
 from dataclasses import dataclass, field
 from pathlib import Path
 
-BAND_INDEX = {
-    "blue":     1,
-    "green":    2,
-    "red":      3,
-    "rededge":  4,
-    "nir":      5,
+# Orden por defecto en exportaciones de Pix4Dfields para DJI Mavic 3M (4 bandas + Alpha)
+DEFAULT_MAVIC3M_BANDS = {
+    "green":   1,
+    "red":     2,
+    "rededge": 3,
+    "nir":     4,
+    "alpha":   5,
 }
 
 EXPECTED_CRS = "EPSG:32618"
@@ -23,6 +24,7 @@ class RasterMetadata:
     bounds: dict
     area_ha: float
     band_count: int
+    band_mapping: dict
     dtype: str
     source_software: str
     capture_datetime: str
@@ -41,7 +43,8 @@ class ProcessedRaster:
 
 class RasterProcessor:
     """
-    Clase para procesar la imagen, sacar metadatos y calcular los indices.
+    Clase para procesar el ortomosaico multiespectral (Mavic 3M / Pix4Dfields),
+    detectar dinamicamente el orden de las bandas y calcular NDVI, NDRE y GNDVI.
     """
     VEGETATION_THRESHOLD = 0.1
 
@@ -55,9 +58,10 @@ class RasterProcessor:
     def process(self):
         with rasterio.open(self.path) as ds:
             self._validate(ds)
-            metadata = self._extract_metadata(ds)
+            band_map = self._resolve_band_mapping(ds)
+            metadata = self._extract_metadata(ds, band_map)
             transform = ds.transform
-            bands = self._load_bands(ds)
+            bands = self._load_bands(ds, band_map)
 
         indices = self._calculate_indices(bands)
         valid_mask = self._build_valid_mask(bands, indices)
@@ -78,18 +82,59 @@ class RasterProcessor:
         )
 
     def _validate(self, ds):
-        if ds.count < 5:
+        if ds.count < 4:
             raise ValueError(
-                f"El archivo tiene {ds.count} bandas, pero necesitamos 5 (Blue/Green/Red/RedEdge/NIR)."
+                f"El archivo tiene {ds.count} bandas, pero necesitamos al menos las 4 bandas "
+                "multiespectrales (Green, Red, RedEdge, NIR)."
             )
         if ds.crs is None:
             raise ValueError(
-                "Error: El GeoTIFF no tiene sistema de coordenadas (CRS). Revisar si es el exportado de Pix4D."
+                "Error: El GeoTIFF no tiene sistema de coordenadas (CRS). Revisar exportacion de Pix4D."
             )
         if CRS.from_user_input(ds.crs) != CRS.from_user_input(EXPECTED_CRS):
             print(f"OJO: El CRS es {ds.crs} pero esperabamos {EXPECTED_CRS}. Puede salir descuadrado.")
 
-    def _extract_metadata(self, ds):
+    def _resolve_band_mapping(self, ds) -> dict:
+        """
+        Inspecciona las descripciones y tags del GeoTIFF (Pix4Dfields) para asignar
+        correctamente Green, Red, RedEdge, NIR y Alpha sin confundir NIR con Alpha.
+        """
+        mapping = {}
+        descriptions = list(ds.descriptions or [])
+
+        for idx in range(1, ds.count + 1):
+            desc = (descriptions[idx - 1] or "").strip().lower()
+            if not desc:
+                b_tags = ds.tags(idx)
+                desc = (
+                    b_tags.get("BAND_NAME", "")
+                    or b_tags.get("DESCRIPTION", "")
+                    or b_tags.get("Name", "")
+                ).strip().lower()
+
+            norm = desc.replace("_", "").replace("-", "").replace(" ", "")
+            if "rededge" in norm or norm == "re":
+                mapping["rededge"] = idx
+            elif "nir" in norm or "nearinfrared" in norm:
+                mapping["nir"] = idx
+            elif "green" in norm:
+                mapping["green"] = idx
+            elif "red" in norm:
+                mapping["red"] = idx
+            elif "alpha" in norm or "mask" in norm:
+                mapping["alpha"] = idx
+
+        required = ("green", "red", "rededge", "nir")
+        if all(k in mapping for k in required):
+            return mapping
+
+        # Fallback seguro para Mavic 3M exportado de Pix4D (Green=1, Red=2, RedEdge=3, NIR=4, Alpha=5)
+        fallback = {
+            k: v for k, v in DEFAULT_MAVIC3M_BANDS.items() if v <= ds.count
+        }
+        return fallback
+
+    def _extract_metadata(self, ds, band_map: dict):
         res_x, res_y = ds.res
         b = ds.bounds
         area_m2 = (b.right - b.left) * (b.top - b.bottom)
@@ -107,19 +152,33 @@ class RasterProcessor:
             },
             area_ha=round(area_m2 / 10_000, 4),
             band_count=ds.count,
+            band_mapping=band_map,
             dtype=ds.dtypes[0],
-            source_software=tags.get("TIFFTAG_SOFTWARE", "desconocido"),
+            source_software=tags.get("TIFFTAG_SOFTWARE", "Pix4Dfields"),
             capture_datetime=tags.get("TIFFTAG_DATETIME", "desconocida"),
         )
 
-    def _load_bands(self, ds):
+    def _load_bands(self, ds, band_map: dict):
         raw = {}
-        for name, idx in BAND_INDEX.items():
+        # Si existe banda Alpha, la cargamos para enmascarar los bordes vacios del ortomosaico
+        alpha_mask = None
+        if "alpha" in band_map:
+            alpha_data = ds.read(band_map["alpha"]).astype(np.float32)
+            alpha_mask = alpha_data > 0
+
+        for name in ("green", "red", "rededge", "nir"):
+            idx = band_map[name]
             data = ds.read(idx).astype(np.float32)
             if ds.nodata is not None:
                 data[data == ds.nodata] = np.nan
-            if np.nanmax(data) > 1.0:
-                data = data / 65535.0
+            if alpha_mask is not None:
+                data[~alpha_mask] = np.nan
+
+            max_val = np.nanmax(data)
+            if max_val > 1.0:
+                # Normalizacion radiometrica (16-bit uint -> reflectancia [0, 1])
+                divisor = 65535.0 if max_val > 255.0 else 255.0
+                data = data / divisor
             raw[name] = data
         return raw
 

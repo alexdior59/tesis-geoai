@@ -9,7 +9,7 @@ class ResponseSerializer:
     """
     Clase para convertir el resultado de la segmentacion a JSON o GeoJSON.
     """
-    API_VERSION = "1.0.0"
+    API_VERSION = "1.1.0"
 
     def __init__(self, processed, result, source_file=""):
         self.processed = processed
@@ -34,6 +34,7 @@ class ResponseSerializer:
                 "area_ha": m.area_ha,
                 "image_size_px": f"{m.width_px} x {m.height_px}",
                 "band_count": m.band_count,
+                "band_mapping": m.band_mapping,
                 "source_software": m.source_software,
                 "capture_datetime": m.capture_datetime,
             },
@@ -57,6 +58,7 @@ class ResponseSerializer:
             "vegetation_indices": self.processed.band_stats,
             "kmeans_zones": [self._zone_to_dict(z) for z in r.kmeans_zones],
             "dbscan_patterns": [self._zone_to_dict(z) for z in r.dbscan_zones],
+            "drift_report": r.drift_report,
             "disclaimer": (
                 "Los resultados identifican patrones espectrales mediante "
                 "clustering no supervisado. No constituyen un diagnostico "
@@ -95,6 +97,7 @@ class ResponseSerializer:
                     "ndvi_mean": zone_data.ndvi_mean,
                     "ndre_mean": zone_data.ndre_mean,
                     "gndvi_mean": zone_data.gndvi_mean,
+                    "anomaly_score_mean": zone_data.anomaly_score_mean,
                 },
             }
             features.append(feature)
@@ -118,6 +121,7 @@ class ResponseSerializer:
             f"CRS          : {m.crs}",
             f"Resolucion   : {m.resolution_m} m/px",
             f"Area total   : {m.area_ha} ha",
+            f"Bandas       : {m.band_mapping}",
             f"Pixeles val. : {r.params.get('n_valid_pixels', '?'):,}",
             "",
             "--- MACRO-ZONIFICACION (FCM) ---",
@@ -128,8 +132,9 @@ class ResponseSerializer:
         ]
         for z in r.kmeans_zones:
             lines.append(
-                f"  [{z.cluster_id}] {z.label:<40} "
-                f"{z.area_ha:>7.4f} ha  NDVI={z.ndvi_mean:.3f}  NDRE={z.ndre_mean:.3f}"
+                f"  [{z.cluster_id}] {z.label:<35} "
+                f"{z.area_ha:>7.4f} ha  NDVI={z.ndvi_mean:.3f}  "
+                f"NDRE={z.ndre_mean:.3f}  Anom={z.anomaly_score_mean:.3f}"
             )
         lines += [
             "",
@@ -140,9 +145,17 @@ class ResponseSerializer:
         for z in r.dbscan_zones:
             tag = " [RUIDO]" if z.is_noise else ""
             lines.append(
-                f"  [{z.cluster_id}] {z.label:<40} "
-                f"{z.pixel_count:>8,} px  NDVI={z.ndvi_mean:.3f}  NDRE={z.ndre_mean:.3f}{tag}"
+                f"  [{z.cluster_id}] {z.label:<35} "
+                f"{z.pixel_count:>8,} px  NDVI={z.ndvi_mean:.3f}  "
+                f"NDRE={z.ndre_mean:.3f}  Anom={z.anomaly_score_mean:.3f}{tag}"
             )
+        if r.drift_report:
+            lines += [
+                "",
+                "--- REPORTE DE DERIVA (DRIFT REPORT) ---",
+                f"Ref. ID      : {r.drift_report.get('reference_model_id')}",
+                f"Shift L2     : {r.drift_report.get('centroid_shift_l2')}",
+            ]
         lines += ["", "=" * 60]
         return "\n".join(lines)
 
@@ -167,6 +180,7 @@ class ResponseSerializer:
             "ndvi_std": zone.ndvi_std,
             "ndre_mean": zone.ndre_mean,
             "gndvi_mean": zone.gndvi_mean,
+            "anomaly_score_mean": zone.anomaly_score_mean,
             "is_noise": zone.is_noise,
         }
 
