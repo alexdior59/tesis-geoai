@@ -6,8 +6,10 @@ services:
     volumes:
       - ./data/input:/geoai/data/input
       - ./data/results:/geoai/data/results
+      - ./data/references:/geoai/data/references
     environment:
       - PYTHONUNBUFFERED=1
-      - GEOAI_DATA_DIR=/geoai/data/results
+      - GEOAI_REF_DIR=/geoai/data/references
+      - GEOAI_RESULTS_DIR=/geoai/data/results
       - GEOAI_MAX_CONCURRENT_JOBS=1
     restart: unless-stopped

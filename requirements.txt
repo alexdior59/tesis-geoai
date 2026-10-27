@@ -3,7 +3,8 @@ uvicorn==0.48.0
 rasterio==1.4.4
 numpy==2.4.6
 scikit-learn==1.8.0
-shapely==2.2.0
+scipy==1.17.1
+shapely==2.1.2
 geopandas==1.1.3
 pydantic==2.13.4
 python-multipart==0.0.29

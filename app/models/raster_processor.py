@@ -49,9 +49,12 @@ class ProcessedRaster:
 class RasterProcessor:
     """Lee el ortomosaico del Mavic 3M y calcula NDVI, NDRE y GNDVI."""
 
-    def __init__(self, tif_path, vegetation_threshold=0.1):
+    VEGETATION_THRESHOLD = 0.1
+
+    def __init__(self, tif_path, vegetation_threshold=None):
         self.path = Path(tif_path)
-        self.vegetation_threshold = vegetation_threshold
+        if vegetation_threshold is not None:
+            self.VEGETATION_THRESHOLD = vegetation_threshold
         if not self.path.exists():
             raise ValueError(f"Archivo no encontrado: {self.path}")
         if self.path.suffix.lower() not in (".tif", ".tiff"):
@@ -69,7 +72,7 @@ class RasterProcessor:
         valid_mask = self._build_valid_mask(bands, indices)
         if not valid_mask.any():
             raise ValueError(
-                f"Ningun pixel supera el umbral de NDVI {self.vegetation_threshold}. "
+                f"Ningun pixel supera el umbral de NDVI {self.VEGETATION_THRESHOLD}. "
                 "Revisar el orden de bandas o el umbral."
             )
 
@@ -159,11 +162,6 @@ class RasterProcessor:
         if "alpha" in band_map:
             alpha_mask = ds.read(band_map["alpha"]) > 0
 
-        # Mismo divisor para todas las bandas: si cada banda se escalara por su
-        # propio maximo, los indices normalizados quedarian distorsionados.
-        dtype = np.dtype(ds.dtypes[band_map["nir"] - 1])
-        divisor = float(np.iinfo(dtype).max) if np.issubdtype(dtype, np.integer) else 1.0
-
         bands = {}
         for name in ("green", "red", "rededge", "nir"):
             data = ds.read(band_map[name]).astype(np.float32)
@@ -171,7 +169,15 @@ class RasterProcessor:
                 data[data == ds.nodata] = np.nan
             if alpha_mask is not None:
                 data[~alpha_mask] = np.nan
-            bands[name] = data / divisor
+            bands[name] = data
+
+        # Un solo divisor para las cuatro bandas. Si cada banda se escalara por su
+        # cuenta, los indices normalizados quedarian distorsionados.
+        max_val = max(float(np.nanmax(b)) for b in bands.values())
+        if max_val > 1.0:
+            divisor = 65535.0 if max_val > 255.0 else 255.0
+            for name in bands:
+                bands[name] /= divisor
         return bands
 
     def _calculate_indices(self, bands):
@@ -192,7 +198,7 @@ class RasterProcessor:
         mask = np.ones(bands["nir"].shape, dtype=bool)
         for arr in list(bands.values()) + list(indices.values()):
             mask &= ~np.isnan(arr)
-        mask &= indices["ndvi"] >= self.vegetation_threshold
+        mask &= indices["ndvi"] >= self.VEGETATION_THRESHOLD
         return mask
 
     @staticmethod
