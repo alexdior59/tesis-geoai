@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   geoai:
     build: .
@@ -10,4 +8,6 @@ services:
       - ./data/results:/geoai/data/results
     environment:
       - PYTHONUNBUFFERED=1
-    # TODO: revisar si necesitamos ponerle restart: always
+      - GEOAI_DATA_DIR=/geoai/data/results
+      - GEOAI_MAX_CONCURRENT_JOBS=1
+    restart: unless-stopped
