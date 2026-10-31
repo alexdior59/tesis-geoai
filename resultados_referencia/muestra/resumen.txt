@@ -1,0 +1,52 @@
+============================================================
+RESUMEN - Motor GeoAI
+============================================================
+Job ID       : 9afdccb5-1c04-48f9-b223-427b73221049
+Archivo      : palma_muestra.tif
+CRS          : EPSG:32618
+Resolucion   : 0.0607 m/px
+Area total   : 0.81 ha
+Bandas       : {'green': 1, 'red': 2, 'rededge': 3, 'nir': 4, 'alpha': 5}
+Pixeles val. : 2,082,234
+
+--- CONDICION POR RANGOS DE NDVI (Palma de aceite) ---
+Area con datos: 0.7677 ha
+  NDVI -1.00 a 0.20  Suelo desnudo o cultivo en senescencia tot    0.028 ha    3.64%
+  NDVI  0.20 a 0.50  Cultivo con estres: zona de inspeccion        0.217 ha   28.32%
+  NDVI  0.50 a 0.60  Transicion entre estres y buena condicion     0.009 ha    1.13%
+  NDVI  0.60 a 1.00  Vegetacion en buena condicion (subrangos r    0.514 ha   66.91%
+Inspeccion   : 28.32% del area (0.2174 ha) en NDVI 0.2-0.5; 1 zonas >= 10.0 m2
+
+--- ANALISIS POR PALMA ---
+Palmas       : 83  (154.9 palmas/ha; esperado 142.6)
+A inspeccionar (NDVI): 4 (4.82%)
+Copa debil (verificar): 7 (8.43%)
+Posibles faltantes: 1
+
+--- MACRO-ZONIFICACION (FCM) ---
+Clusters     : 4
+Silhouette   : 0.5055  (estructura razonable)
+Davies-Bould.: 0.7548
+FPC (Bezdek) : 0.7272  (1/k = sin estructura, 1 = nitida)
+  [3] zona_buena_condicion_3            0.1694 ha  NDVI=0.881  NDRE=0.350  Desv=0.232
+  [1] zona_buena_condicion_1            0.2312 ha  NDVI=0.843  NDRE=0.287  Desv=0.221
+  [0] zona_buena_condicion_0            0.1249 ha  NDVI=0.743  NDRE=0.238  Desv=0.345
+  [2] zona_estres_2                     0.2414 ha  NDVI=0.254  NDRE=0.102  Desv=0.285
+
+--- TRANSICION ENTRE ZONAS (pertenencia < 0.6) ---
+Pixeles      : 15.11% (0.1158 ha)
+  [3]  13.23% en transicion; se mezcla con: zona 1 100.0%
+  [1]  23.04% en transicion; se mezcla con: zona 0 52.05%, zona 3 47.95%
+  [0]  28.89% en transicion; se mezcla con: zona 1 89.68%, zona 2 10.32%
+  [2]   1.69% en transicion; se mezcla con: zona 0 100.0%
+
+--- EXPLICABILIDAD ---
+Importancia (% de pixeles que cambian de zona al desordenar el indice): NDVI 29.11%, NDRE 42.26%, GNDVI 31.25%
+Arbol sustituto (profundidad 3): fidelidad 91.51%
+Incertidumbre: pertenencia maxima media 0.8149; 15.11% de pixeles de transicion (pertenencia < 0.6)
+
+--- PATRONES ESPACIALES ATIPICOS (DBSCAN) ---
+Patrones     : 250
+Ruido        : 16.69%
+
+============================================================

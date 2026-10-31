@@ -9,7 +9,7 @@ from rasterio.features import shapes, sieve
 from shapely.geometry import mapping, shape
 from shapely.ops import unary_union
 
-API_VERSION = "1.2.0"
+API_VERSION = "1.3.0"
 MAX_PALMAS_EN_JSON = 200
 TRANSITION_CODE = 200
 NODATA_CODE = 255

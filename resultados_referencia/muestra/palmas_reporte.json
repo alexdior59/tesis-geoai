@@ -1,0 +1,161 @@
+{
+  "conteo_palmas": 83,
+  "area_plantacion_ha": 0.536,
+  "densidad_palmas_ha": 154.9,
+  "densidad_esperada_palmas_ha": 142.6,
+  "ndvi_copa": {
+    "media": 0.864,
+    "mediana": 0.877,
+    "p5": 0.765,
+    "p95": 0.901
+  },
+  "palmas_a_inspeccionar": 4,
+  "pct_palmas_a_inspeccionar": 4.82,
+  "palmas_copa_debil": 7,
+  "pct_palmas_copa_debil": 8.43,
+  "posibles_faltantes": 1,
+  "parametros": {
+    "distancia_siembra_m": 9.0,
+    "ndvi_alerta_copa": 0.5,
+    "umbral_relativo_mad": 3.0,
+    "caida_minima_vs_vecinas": 0.1,
+    "radio_vecindad_m": 30.0,
+    "contraste_copa_fuerte": 1.5,
+    "contraste_copa_debil": 0.5,
+    "resolucion_analisis_m": 0.303
+  },
+  "lista_inspeccion": [
+    {
+      "palma_id": 26,
+      "lat": 4.0006957,
+      "lon": -73.395045,
+      "x_utm": 678182.25,
+      "y_utm": 442378.44,
+      "ndvi_copa": 0.718,
+      "ndre_copa": 0.237,
+      "estado": "inspeccionar",
+      "motivo": "NDVI 0.16 por debajo de la mediana de sus vecinas"
+    },
+    {
+      "palma_id": 38,
+      "lat": 4.0005781,
+      "lon": -73.3952064,
+      "x_utm": 678164.35,
+      "y_utm": 442365.4,
+      "ndvi_copa": 0.734,
+      "ndre_copa": 0.237,
+      "estado": "inspeccionar",
+      "motivo": "NDVI 0.14 por debajo de la mediana de sus vecinas"
+    },
+    {
+      "palma_id": 62,
+      "lat": 4.0003201,
+      "lon": -73.3951687,
+      "x_utm": 678168.6,
+      "y_utm": 442336.87,
+      "ndvi_copa": 0.762,
+      "ndre_copa": 0.242,
+      "estado": "inspeccionar",
+      "motivo": "NDVI 0.11 por debajo de la mediana de sus vecinas"
+    },
+    {
+      "palma_id": 15,
+      "lat": 4.0007863,
+      "lon": -73.3950284,
+      "x_utm": 678184.07,
+      "y_utm": 442388.46,
+      "ndvi_copa": 0.765,
+      "ndre_copa": 0.26,
+      "estado": "inspeccionar",
+      "motivo": "NDVI 0.11 por debajo de la mediana de sus vecinas"
+    }
+  ],
+  "lista_copa_debil": [
+    {
+      "palma_id": 23,
+      "lat": 4.0007105,
+      "lon": -73.3955587,
+      "x_utm": 678125.21,
+      "y_utm": 442379.96,
+      "ndvi_copa": 0.853,
+      "ndre_copa": 0.336,
+      "estado": "verificar_copa",
+      "motivo": "Copa pequena o poco definida: palma joven, resembrada o enferma"
+    },
+    {
+      "palma_id": 32,
+      "lat": 4.0006333,
+      "lon": -73.3953648,
+      "x_utm": 678146.75,
+      "y_utm": 442371.47,
+      "ndvi_copa": 0.9,
+      "ndre_copa": 0.321,
+      "estado": "verificar_copa",
+      "motivo": "Copa pequena o poco definida: palma joven, resembrada o enferma"
+    },
+    {
+      "palma_id": 53,
+      "lat": 4.0004355,
+      "lon": -73.3952559,
+      "x_utm": 678158.89,
+      "y_utm": 442349.62,
+      "ndvi_copa": 0.821,
+      "ndre_copa": 0.283,
+      "estado": "verificar_copa",
+      "motivo": "Copa pequena o poco definida: palma joven, resembrada o enferma"
+    },
+    {
+      "palma_id": 71,
+      "lat": 4.000227,
+      "lon": -73.3952864,
+      "x_utm": 678155.55,
+      "y_utm": 442326.56,
+      "ndvi_copa": 0.814,
+      "ndre_copa": 0.262,
+      "estado": "verificar_copa",
+      "motivo": "Copa pequena o poco definida: palma joven, resembrada o enferma"
+    },
+    {
+      "palma_id": 74,
+      "lat": 4.0001857,
+      "lon": -73.3952154,
+      "x_utm": 678163.44,
+      "y_utm": 442322.01,
+      "ndvi_copa": 0.884,
+      "ndre_copa": 0.261,
+      "estado": "verificar_copa",
+      "motivo": "Copa pequena o poco definida: palma joven, resembrada o enferma"
+    },
+    {
+      "palma_id": 77,
+      "lat": 4.0001663,
+      "lon": -73.3951389,
+      "x_utm": 678171.94,
+      "y_utm": 442319.88,
+      "ndvi_copa": 0.766,
+      "ndre_copa": 0.264,
+      "estado": "verificar_copa",
+      "motivo": "Copa pequena o poco definida: palma joven, resembrada o enferma"
+    },
+    {
+      "palma_id": 81,
+      "lat": 4.0001119,
+      "lon": -73.3953932,
+      "x_utm": 678143.72,
+      "y_utm": 442313.81,
+      "ndvi_copa": 0.835,
+      "ndre_copa": 0.228,
+      "estado": "verificar_copa",
+      "motivo": "Copa pequena o poco definida: palma joven, resembrada o enferma"
+    }
+  ],
+  "lista_faltantes": [
+    {
+      "faltante_id": 1,
+      "lat": 4.0003618,
+      "lon": -73.3954418,
+      "x_utm": 678138.25,
+      "y_utm": 442341.42
+    }
+  ]
+}

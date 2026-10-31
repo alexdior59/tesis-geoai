@@ -29,12 +29,8 @@ def local_attribution(z, centers, feature_names=FEATURE_NAMES):
 
 class ZoneExplainer:
     """
-    Explica la zonificacion FCM con cinco piezas:
-      1. prototipos: el perfil medio (centroide) de cada zona en unidades originales;
-      2. importancia por permutacion: % de pixeles que cambian de zona al desordenar cada indice;
-      3. modelo sustituto: arbol de decision poco profundo que imita al FCM, con su fidelidad y reglas;
-      4. explicaciones locales exactas de pixeles tipicos y de transicion;
-      5. incertidumbre: grado de pertenencia y proporcion de pixeles de transicion.
+    Prototipos de cada zona, importancia por permutacion, arbol sustituto con sus reglas,
+    explicaciones locales de algunos pixeles e incertidumbre de la asignacion.
     """
 
     def __init__(self, sample_size=200_000, transition_threshold=0.6, tree_depth=3, random_state=42):
@@ -65,9 +61,8 @@ class ZoneExplainer:
             "incertidumbre": self._uncertainty(memberships if memberships is not None else u_sample,
                                                len(centers)),
             "nota": (
-                "La explicacion local es aditiva y exacta para un modelo de prototipos (asignacion al "
-                "centroide mas cercano): los aportes de los indices suman la ventaja de la zona asignada "
-                "sobre la segunda, la misma propiedad de precision local que garantizan los valores SHAP."
+                "En la explicacion local, los aportes de NDVI, NDRE y GNDVI suman exactamente la "
+                "ventaja de la zona asignada sobre la segunda mas cercana (como en los valores SHAP)."
             ),
         }
 

@@ -1,0 +1,46 @@
+============================================================
+RESUMEN - Motor GeoAI
+============================================================
+Job ID       : 63e8edf7-b06a-4b4f-809a-e8501e5e1cbd
+Archivo      : Ortomosaico.data.tif
+CRS          : EPSG:32618
+Resolucion   : 0.0607 m/px
+Area total   : 33.4407 ha
+Bandas       : {'green': 1, 'red': 2, 'rededge': 3, 'nir': 4, 'alpha': 5}
+Pixeles val. : 65,511,018
+
+--- CONDICION POR RANGOS DE NDVI (Palma de aceite) ---
+Area con datos: 24.1383 ha
+  NDVI -1.00 a 0.20  Suelo desnudo o cultivo en senescencia tot    0.039 ha    0.16%
+  NDVI  0.20 a 0.50  Cultivo con estres: zona de inspeccion        0.541 ha    2.24%
+  NDVI  0.50 a 0.60  Transicion entre estres y buena condicion     0.180 ha    0.75%
+  NDVI  0.60 a 1.00  Vegetacion en buena condicion (subrangos r   23.378 ha   96.85%
+Inspeccion   : 2.24% del area (0.5409 ha) en NDVI 0.2-0.5; 14 zonas >= 10.0 m2
+
+--- ANALISIS POR PALMA ---
+Palmas       : 3,067  (146.3 palmas/ha; esperado 142.6)
+A inspeccionar (NDVI): 23 (0.75%)
+Copa debil (verificar): 363 (11.84%)
+Posibles faltantes: 161
+
+--- MACRO-ZONIFICACION (FCM) ---
+Clusters     : 4
+Silhouette   : 0.3451  (estructura debil)
+Davies-Bould.: 0.8117
+FPC (Bezdek) : 0.6242  (1/k = sin estructura, 1 = nitida)
+  [2] zona_buena_condicion_2            6.7149 ha  NDVI=0.887  NDRE=0.373  Desv=0.249
+  [1] zona_buena_condicion_1           10.6476 ha  NDVI=0.857  NDRE=0.310  Desv=0.202
+  [0] zona_buena_condicion_0            6.1988 ha  NDVI=0.783  NDRE=0.266  Desv=0.307
+  [3] zona_estres_3                     0.5762 ha  NDVI=0.299  NDRE=0.127  Desv=0.437
+
+--- EXPLICABILIDAD ---
+Importancia (% de pixeles que cambian de zona al desordenar el indice): NDVI 16.59%, NDRE 42.79%, GNDVI 28.04%
+Arbol sustituto (profundidad 3): fidelidad 89.85%
+Incertidumbre: pertenencia maxima media 0.7357; 23.79% de pixeles de transicion (pertenencia < 0.6)
+
+--- PATRONES ESPACIALES ATIPICOS (DBSCAN) ---
+Patrones     : 1075
+Ruido        : 29.31%
+
+============================================================
+Tiempo total: 149 s. Salidas en C:\Users\samue\Downloads\NVDI (1)\NVDI\PALMA\resultados_v1_2

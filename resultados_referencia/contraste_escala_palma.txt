@@ -1,0 +1,47 @@
+Escala: Concepto del codirector (area agronomica), Acta de reunion N. 01 del 17/10/2026
+zona rango del modelo       NDVI   NDRE puntos coinciden
+   2 buena_condicion       0.887  0.373     30        30
+   1 buena_condicion       0.857  0.310     30        30
+   0 buena_condicion       0.783  0.266     30        29
+   3 estres                0.299  0.127     30        27
+ pol zona rango del modelo       NDVI  % en rango modelo dominante           
+   1    2 buena_condicion       0.889               99.8 buena_condicion     
+   2    2 buena_condicion       0.880              100.0 buena_condicion     
+   3    2 buena_condicion       0.858               99.9 buena_condicion     
+   4    2 buena_condicion       0.867              100.0 buena_condicion     
+   5    2 buena_condicion       0.887              100.0 buena_condicion     
+   6    2 buena_condicion       0.870               99.6 buena_condicion     
+   7    2 buena_condicion       0.854              100.0 buena_condicion     
+   8    2 buena_condicion       0.853               99.6 buena_condicion     
+   9    2 buena_condicion       0.870               99.9 buena_condicion     
+  10    2 buena_condicion       0.869               99.9 buena_condicion     
+  11    2 buena_condicion       0.891               99.9 buena_condicion     
+  12    2 buena_condicion       0.882               99.7 buena_condicion     
+  13    2 buena_condicion       0.878               99.9 buena_condicion     
+  14    2 buena_condicion       0.863              100.0 buena_condicion     
+  15    2 buena_condicion       0.896               99.9 buena_condicion     
+  16    1 buena_condicion       0.864               99.3 buena_condicion     
+  17    1 buena_condicion       0.854               99.9 buena_condicion     
+  18    1 buena_condicion       0.848               99.8 buena_condicion     
+  19    1 buena_condicion       0.855              100.0 buena_condicion     
+  20    1 buena_condicion       0.846               99.9 buena_condicion     
+  21    0 buena_condicion       0.806               96.5 buena_condicion     
+  22    0 buena_condicion       0.796               90.9 buena_condicion     
+  23    0 buena_condicion       0.816               98.9 buena_condicion     
+  24    0 buena_condicion       0.810               98.8 buena_condicion     
+  25    0 buena_condicion       0.764               95.0 buena_condicion     
+  26    0 buena_condicion       0.837              100.0 buena_condicion     
+  27    0 buena_condicion       0.812               97.4 buena_condicion     
+  28    0 buena_condicion       0.785               90.7 buena_condicion     
+  29    0 buena_condicion       0.849               94.6 buena_condicion     
+  30    0 buena_condicion       0.807               98.5 buena_condicion     
+  31    0 buena_condicion       0.787               91.5 buena_condicion     
+  32    0 buena_condicion       0.794               96.7 buena_condicion     
+  33    0 buena_condicion       0.796               99.0 buena_condicion     
+  34    0 buena_condicion       0.802               97.9 buena_condicion     
+  35    0 buena_condicion       0.653               58.5 buena_condicion     
+  36    3 estres                0.263               91.1 estres              
+Acuerdo en puntos: 96.7 % de 120.
+Acuerdo en polígonos (rango dominante): 100.0 % de 36.
+Las zonas 2, 1, 0 caen en el mismo rango de la escala (buena condición): la regla no las separa; su diferencia está en NDRE. Qué cobertura hay en cada una lo define el experto.
+Excel: C:\Users\samue\Downloads\NVDI (1)\NVDI\PALMA\resultados_v1_2\Contraste_escala_codirector_PALMA.xlsx

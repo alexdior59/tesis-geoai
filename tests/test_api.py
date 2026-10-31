@@ -66,7 +66,7 @@ def test_validaciones_de_entrada(api, lote_cuadrantes, tmp_path):
 def test_analisis_completo_generico(api, lote_franjas):
     client, _ = api
     job, res = analizar(client, lote_franjas, crop_type="generico", kmeans_k=3)
-    assert res["api_version"] == "1.2.0"
+    assert res["api_version"] == "1.3.0"
     assert res["condicion_por_rangos"]["cultivo"] == "generico"
     assert res["analisis_palmas"] is None
     assert res["quality_metrics"]["kmeans"]["fcm_partition_coefficient"] is not None

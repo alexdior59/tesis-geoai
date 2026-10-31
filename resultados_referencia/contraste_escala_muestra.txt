@@ -1,0 +1,9 @@
+Escala: Concepto del codirector (area agronomica), Acta de reunion N. 01 del 17/10/2026
+zona rango del modelo       NDVI   NDRE puntos coinciden
+   3 buena_condicion       0.881  0.350      1         1
+   1 buena_condicion       0.843  0.287     12        12
+   0 buena_condicion       0.743  0.238     30        28
+   2 estres                0.254  0.102     16        16
+Acuerdo en puntos: 96.6 % de 59.
+Las zonas 3, 1, 0 caen en el mismo rango de la escala (buena condición): la regla no las separa; su diferencia está en NDRE. Qué cobertura hay en cada una lo define el experto.
+Excel: resultados_referencia\muestra\contraste_escala_experto.xlsx

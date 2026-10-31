@@ -8,3 +8,7 @@ data/
 *.geojson
 *.json
 .env
+!sample_data/*.tif
+!resultados_referencia/**/*.json
+!resultados_referencia/**/*.geojson
+!resultados_referencia/**/*.tif

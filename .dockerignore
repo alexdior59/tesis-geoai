@@ -3,6 +3,9 @@ __pycache__/
 *.pyo
 .pytest_cache/
 tests/
+experiments/
+resultados_referencia/
+sample_data/
 data/
 *.tif
 *.tiff

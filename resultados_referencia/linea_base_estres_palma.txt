@@ -1,0 +1,14 @@
+Mismo vuelo contra su linea base: coincidencia 100.00%
+
+Estres simulado: NIR x 0.85 en la mitad izquierda
+Mitad        Metodo                                Cambian de zona  Bajan de zona
+con estres   centroides re-ajustados (anterior)             39.1%         39.1%
+con estres   centroides congelados (v1.2)                   64.9%         64.9%
+sin cambio   centroides re-ajustados (anterior)             34.2%          0.0%
+sin cambio   centroides congelados (v1.2)                    0.0%          0.0%
+
+Reporte de cambio por zona (v1.2):
+  zona 0: 6.20 ha -> 11.20 ha (80.67%)  desplazamiento del centroide 1.0622
+  zona 1: 10.65 ha -> 8.23 ha (-22.74%)  desplazamiento del centroide 0.648
+  zona 2: 6.71 ha -> 4.09 ha (-39.02%)  desplazamiento del centroide 0.4097
+  zona 3: 0.58 ha -> 0.62 ha (7.15%)  desplazamiento del centroide 0.1021

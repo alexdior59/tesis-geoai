@@ -1,0 +1,51 @@
+1) PROTOTIPO DE CADA ZONA (unidades originales)
+  zona 2: NDVI 0.886  NDRE 0.369  GNDVI 0.791  (27.82% de los pixeles)
+  zona 1: NDVI 0.856  NDRE 0.310  GNDVI 0.742  (44.11% de los pixeles)
+  zona 0: NDVI 0.792  NDRE 0.268  GNDVI 0.681  (25.68% de los pixeles)
+  zona 3: NDVI 0.283  NDRE 0.118  GNDVI 0.360  (2.39% de los pixeles)
+
+2) INCERTIDUMBRE: pertenencia maxima media 0.7357; 23.79% de pixeles de transicion (pertenencia < 0.6); minimo teorico 0.25
+
+3) TABLA DE ATRIBUTOS: pixeles reales
+ fila    col      x_utm       y_utm   NDVI   NDRE  GNDVI |    u2    u1    u0    u3 | zona
+ 4067   7807   677962.0    442469.0  0.883  0.371  0.783 |  0.99  0.01  0.00  0.00 |  2
+ 3772   7813   677962.3    442486.9  0.855  0.306  0.744 |  0.00  0.99  0.00  0.00 |  1
+ 3062  10759   678141.1    442530.0  0.808  0.279  0.685 |  0.01  0.06  0.93  0.00 |  0
+ 5916  11795   678204.0    442356.8  0.269  0.096  0.333 |  0.00  0.00  0.01  0.99 |  3
+ 3711   4967   677789.6    442490.6  0.897  0.334  0.774 |  0.50  0.44  0.06  0.00 |  2
+
+4) EXPLICACION LOCAL EXACTA del pixel de transicion (pertenencia 0.50)
+  zona asignada 2, segunda opcion 1; ventaja total +0.058 = suma de aportes
+    NDVI : +0.145  (favorece la zona 2)
+    NDRE : -0.213  (va en contra de la zona 2)
+    GNDVI: +0.126  (favorece la zona 2)
+
+5) IMPORTANCIA GLOBAL POR PERMUTACION
+  al desordenar NDVI  cambian de zona 16.59% de los pixeles
+  al desordenar NDRE  cambian de zona 42.79% de los pixeles
+  al desordenar GNDVI cambian de zona 28.04% de los pixeles
+
+6) ARBOL SUSTITUTO (profundidad 3): fidelidad 89.85% | importancia NDVI 0.00, NDRE 0.43, GNDVI 0.57
+|--- NDRE <= 0.339
+|   |--- GNDVI <= 0.713
+|   |   |--- GNDVI <= 0.513
+|   |   |   |--- class: 3
+|   |   |--- GNDVI >  0.513
+|   |   |   |--- class: 0
+|   |--- GNDVI >  0.713
+|   |   |--- GNDVI <= 0.780
+|   |   |   |--- class: 1
+|   |   |--- GNDVI >  0.780
+|   |   |   |--- class: 2
+|--- NDRE >  0.339
+|   |--- GNDVI <= 0.756
+|   |   |--- NDRE <= 0.365
+|   |   |   |--- class: 1
+|   |   |--- NDRE >  0.365
+|   |   |   |--- class: 2
+|   |--- GNDVI >  0.756
+|   |   |--- GNDVI <= 0.764
+|   |   |   |--- class: 2
+|   |   |--- GNDVI >  0.764
+|   |   |   |--- class: 2
+
