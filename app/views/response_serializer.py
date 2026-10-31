@@ -11,6 +11,8 @@ from shapely.ops import unary_union
 
 API_VERSION = "1.2.0"
 MAX_PALMAS_EN_JSON = 200
+TRANSITION_CODE = 200
+NODATA_CODE = 255
 
 
 class ResponseSerializer:
@@ -72,6 +74,7 @@ class ResponseSerializer:
             },
             "vegetation_indices": self.processed.band_stats,
             "kmeans_zones": [self._zone_to_dict(z) for z in r.kmeans_zones],
+            "transicion": r.transition_report,
             "explicabilidad": self.explainability,
             "dbscan_patterns": [self._zone_to_dict(z) for z in r.dbscan_zones],
             "drift_report": r.drift_report,
@@ -227,6 +230,16 @@ class ResponseSerializer:
                 f"  [{z.cluster_id}] {z.label:<32} {z.area_ha:>7.4f} ha  NDVI={z.ndvi_mean:.3f}  "
                 f"NDRE={z.ndre_mean:.3f}  Desv={z.deviation_score_mean:.3f}{name}"
             )
+        t = r.transition_report
+        if t:
+            lines += [
+                "",
+                f"--- TRANSICION ENTRE ZONAS (pertenencia < {t['umbral_pertenencia']}) ---",
+                f"Pixeles      : {t['pct_pixeles_transicion']}% ({t['area_transicion_ha']} ha)",
+            ]
+            for zt in t["por_zona"]:
+                mezcla = ", ".join(f"zona {cid} {pct}%" for cid, pct in zt["se_mezcla_con"].items()) or "-"
+                lines.append(f"  [{zt['cluster_id']}] {zt['pct_transicion']:>6.2f}% en transicion; se mezcla con: {mezcla}")
         e = self.explainability
         if e:
             imp = e["importancia_permutacion"]
@@ -267,14 +280,30 @@ class ResponseSerializer:
         """Pertenencia de cada pixel a su zona, en %. 100 = asignacion segura, 255 = sin dato."""
         if self.result.max_membership is None:
             return None
+        values = np.clip(np.round(self.result.max_membership * 100), 0, 100).astype(np.uint8)
+        return self._write_class_tif(path, values, "Pertenencia maxima FCM (%)")
+
+    def write_zones_tif(self, path, threshold):
+        """
+        Mapa de zonas FCM con la clase de transicion: cada pixel lleva el numero de su zona,
+        salvo los de pertenencia menor al umbral, que llevan 200. 255 = sin dato.
+        """
+        r = self.result
+        if r.max_membership is None:
+            return None
+        values = r.kmeans_labels.astype(np.uint8)
+        values[r.max_membership < threshold] = TRANSITION_CODE
+        return self._write_class_tif(path, values, f"Zona FCM ({TRANSITION_CODE} = transicion)")
+
+    def _write_class_tif(self, path, values, description):
         valid = self.processed.valid_mask
-        raster = np.full(valid.shape, 255, dtype=np.uint8)
-        raster[valid] = np.clip(np.round(self.result.max_membership * 100), 0, 100).astype(np.uint8)
+        raster = np.full(valid.shape, NODATA_CODE, dtype=np.uint8)
+        raster[valid] = values
         with rasterio.open(path, "w", driver="GTiff", height=raster.shape[0], width=raster.shape[1], count=1,
-                           dtype="uint8", nodata=255, crs=self.processed.metadata.crs,
+                           dtype="uint8", nodata=NODATA_CODE, crs=self.processed.metadata.crs,
                            transform=self.processed.transform, compress="deflate", tiled=True) as dst:
             dst.write(raster, 1)
-            dst.set_band_description(1, "Pertenencia maxima FCM (%)")
+            dst.set_band_description(1, description)
         return path
 
     def save_json(self, path):

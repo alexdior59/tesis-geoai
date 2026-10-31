@@ -36,6 +36,8 @@ class SegmentationResult:
     model_artifacts: dict = field(default_factory=dict)
     max_membership: np.ndarray | None = None
     outlier_indices: np.ndarray | None = None
+    second_labels: np.ndarray | None = None
+    transition_report: dict | None = None
 
 
 class SpatialSegmenter:
@@ -47,6 +49,8 @@ class SpatialSegmenter:
     FCM_SAMPLE_SIZE = 100_000
     OUTLIER_PERCENTILE = 95
     MAX_OUTLIERS = 200_000
+    # Un pixel con pertenencia maxima menor a este valor queda entre dos zonas
+    TRANSITION_THRESHOLD = 0.6
 
     def __init__(
             self,
@@ -97,7 +101,9 @@ class SpatialSegmenter:
             features_scaled = scaler.fit_transform(features)
             fcm_centers = self._fit_fcm(features_scaled)
 
-        labels, min_distances, memberships = self._assign(features_scaled, fcm_centers, self.fcm_m)
+        labels, min_distances, memberships, second_labels = self._assign(
+            features_scaled, fcm_centers, self.fcm_m
+        )
 
         # La desviacion se normaliza con el p99 de la linea base para que un
         # empeoramiento general del lote no quede oculto al comparar vuelos.
@@ -121,6 +127,10 @@ class SpatialSegmenter:
             deviation_scores[outlier_indices],
             prefix="patron",
             include_noise=True,
+        )
+
+        transition_report = self._compute_transition_report(
+            labels, second_labels, memberships, kmeans_zones
         )
 
         drift_report = None
@@ -167,6 +177,8 @@ class SpatialSegmenter:
             model_artifacts=model_artifacts,
             max_membership=memberships,
             outlier_indices=outlier_indices,
+            second_labels=second_labels,
+            transition_report=transition_report,
         )
 
     def _fit_fcm(self, features_scaled, initial_centers=None, max_iter=50, tol=1e-4):
@@ -181,6 +193,16 @@ class SpatialSegmenter:
             centers = np.array(initial_centers, dtype=np.float64)
         else:
             centers = sample[rng.choice(sample_size, size=self.kmeans_k, replace=False)].copy()
+            # Si dos centroides iniciales son el mismo pixel repetido, FCM nunca los separa;
+            # en ese caso se arranca desde valores distintos de la muestra.
+            if len(np.unique(centers, axis=0)) < self.kmeans_k:
+                distinct = np.unique(sample, axis=0)
+                if len(distinct) < self.kmeans_k:
+                    raise ValueError(
+                        f"La imagen solo tiene {len(distinct)} combinaciones distintas de indices; "
+                        f"no alcanzan para {self.kmeans_k} zonas."
+                    )
+                centers = distinct[rng.choice(len(distinct), size=self.kmeans_k, replace=False)].copy()
 
         exp = 2.0 / (self.fcm_m - 1.0)
         for _ in range(max_iter):
@@ -199,16 +221,60 @@ class SpatialSegmenter:
     def _assign(features_scaled, centers, fcm_m=2.0, batch_size=500_000):
         n_total = features_scaled.shape[0]
         labels = np.empty(n_total, dtype=np.int16)
+        second_labels = np.empty(n_total, dtype=np.int16)
         min_distances = np.empty(n_total, dtype=np.float32)
         memberships = np.empty(n_total, dtype=np.float32)
         for start in range(0, n_total, batch_size):
             end = min(start + batch_size, n_total)
             d = np.linalg.norm(features_scaled[start:end, None, :] - centers[None, :, :], axis=2)
-            # el centroide mas cercano es tambien el de mayor pertenencia
-            labels[start:end] = np.argmin(d, axis=1)
-            min_distances[start:end] = d.min(axis=1)
+            # el centroide mas cercano es tambien el de mayor pertenencia;
+            # el segundo mas cercano es la zona con la que el pixel se mezcla
+            first = np.argmin(d, axis=1)
+            rows = np.arange(end - start)
+            labels[start:end] = first
+            min_distances[start:end] = d[rows, first]
             memberships[start:end] = max_membership(d, fcm_m)
-        return labels, min_distances, memberships
+            d[rows, first] = np.inf
+            second_labels[start:end] = np.argmin(d, axis=1)
+        return labels, min_distances, memberships, second_labels
+
+    def _compute_transition_report(self, labels, second_labels, memberships, zones):
+        px_area_ha = (self.resolution_m ** 2) / 10_000
+        in_transition = memberships < self.TRANSITION_THRESHOLD
+        n_total = labels.size
+        n_transition = int(in_transition.sum())
+
+        by_zone = []
+        for zone in zones:
+            in_zone = labels == zone.cluster_id
+            zone_transition = in_zone & in_transition
+            n_zone, n_zone_transition = int(in_zone.sum()), int(zone_transition.sum())
+            # con que otras zonas se mezclan los pixeles de transicion de esta zona
+            partners, counts = np.unique(second_labels[zone_transition], return_counts=True)
+            mixes_with = {
+                str(int(p)): round(float(c * 100.0 / n_zone_transition), 2)
+                for p, c in sorted(zip(partners.tolist(), counts.tolist()), key=lambda pc: -pc[1])
+            }
+            by_zone.append({
+                "cluster_id": zone.cluster_id,
+                "label": zone.label,
+                "expert_label": zone.expert_label,
+                "pct_transicion": round(n_zone_transition * 100.0 / n_zone, 2) if n_zone else 0.0,
+                "area_transicion_ha": round(n_zone_transition * px_area_ha, 4),
+                "se_mezcla_con": mixes_with,
+            })
+
+        return {
+            "umbral_pertenencia": self.TRANSITION_THRESHOLD,
+            "pct_pixeles_transicion": round(n_transition * 100.0 / max(n_total, 1), 2),
+            "area_transicion_ha": round(n_transition * px_area_ha, 4),
+            "por_zona": by_zone,
+            "nota": (
+                "Un pixel de transicion conserva la zona de mayor pertenencia en el mapa de zonas; "
+                "aqui se reporta aparte porque su asignacion es poco segura. se_mezcla_con indica, "
+                "en %, la segunda zona mas cercana de esos pixeles."
+            ),
+        }
 
     def _run_dbscan(self, spatial_coords, min_distances):
         threshold = np.percentile(min_distances, self.OUTLIER_PERCENTILE)

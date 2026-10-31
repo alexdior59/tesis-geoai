@@ -230,6 +230,18 @@ def get_uncertainty(job_id: str):
 
 
 @router.get(
+    "/result/{job_id}/zones-map",
+    summary="Mapa de zonas FCM con la clase de transicion (GeoTIFF: numero de zona, 200 = transicion)",
+)
+def get_zones_map(job_id: str):
+    job = _get_completed_job(job_id)
+    path = job.get("result_zones_map_path")
+    if not path or not Path(path).exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapa de zonas no disponible.")
+    return FileResponse(path, media_type="image/tiff", filename=f"zonas_transicion_{job_id}.tif")
+
+
+@router.get(
     "/result/{job_id}/accuracy-sample",
     summary="Puntos de verificacion estratificados por zona (sin la zona del modelo)",
 )
@@ -442,7 +454,7 @@ def _run_pipeline(job_id: str, tif_path: Path, params: AnalysisParams):
                 palm_report, palms_geojson = PalmAnalyzer(**profile["palm_analysis"]).analyze(tif_path, processed)
 
             art = seg_result.model_artifacts
-            explainability = ZoneExplainer().explain(
+            explainability = ZoneExplainer(transition_threshold=SpatialSegmenter.TRANSITION_THRESHOLD).explain(
                 processed.feature_stack, seg_result.kmeans_labels, art["fcm_centers"],
                 art["scaler_mean"], art["scaler_scale"], fcm_m=art["fcm_m"],
                 memberships=seg_result.max_membership,
@@ -465,6 +477,9 @@ def _run_pipeline(job_id: str, tif_path: Path, params: AnalysisParams):
             job_dir = RESULTS_DIR / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
             uncertainty_path = serializer.write_uncertainty_tif(job_dir / "incertidumbre.tif")
+            zones_map_path = serializer.write_zones_tif(
+                job_dir / "zonas_transicion.tif", SpatialSegmenter.TRANSITION_THRESHOLD
+            )
 
             def plain(obj):
                 return json.loads(json.dumps(obj, default=serializer._json_default))
@@ -479,6 +494,7 @@ def _run_pipeline(job_id: str, tif_path: Path, params: AnalysisParams):
                 result_palms_geojson=plain(palms_geojson) if palms_geojson else None,
                 result_summary=serializer.to_summary(),
                 result_uncertainty_path=str(uncertainty_path) if uncertainty_path else None,
+                result_zones_map_path=str(zones_map_path) if zones_map_path else None,
                 accuracy_points=points,
                 accuracy_geojson=blind_geojson(points, processed.metadata.crs),
                 model_artifacts=seg_result.model_artifacts,
