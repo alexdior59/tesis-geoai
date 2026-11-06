@@ -1,0 +1,6 @@
+ k    FPI    MPE    FPC   Silh     DB   zonas: NDVI medio (rango) y % del area
+ 2  0.511  0.583  0.745  0.408  0.918   0.88 (buena_condicion) 58% | 0.79 (buena_condicion) 42%
+ 3  0.529  0.563  0.647  0.362  0.924   0.89 (buena_condicion) 36% | 0.85 (buena_condicion) 48% | 0.72 (buena_condicion) 15%
+ 4  0.533  0.532  0.600  0.335  0.914   0.89 (buena_condicion) 25% | 0.86 (buena_condicion) 42% | 0.81 (buena_condicion) 29% | 0.57 (transicion) 4%
+ 5  0.569  0.541  0.545  0.296  0.952   0.90 (buena_condicion) 17% | 0.87 (buena_condicion) 34% | 0.84 (buena_condicion) 31% | 0.77 (buena_condicion) 17% | 0.46 (estres) 2%
+ 6  0.604  0.557  0.496  0.270  1.022   0.90 (buena_condicion) 13% | 0.88 (buena_condicion) 27% | 0.85 (buena_condicion) 28% | 0.83 (buena_condicion) 21% | 0.72 (buena_condicion) 9% | 0.40 (estres) 1%

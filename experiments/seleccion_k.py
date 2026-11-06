@@ -9,7 +9,7 @@ Para cada k calcula:
 y el NDVI medio de cada zona con su rango en la escala del codirector.
 
 Uso:
-    python experiments/seleccion_k.py <ortomosaico.tif> [--kmin 2] [--kmax 6]
+    python experiments/seleccion_k.py <ortomosaico.tif> [--kmin 2] [--kmax 6] [--lote lote.geojson]
 """
 import argparse
 import sys
@@ -20,6 +20,7 @@ from sklearn.metrics import davies_bouldin_score, silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.models.aoi import read_aoi  # noqa: E402
 from app.models.crop_profiles import range_for  # noqa: E402
 from app.models.raster_processor import RasterProcessor  # noqa: E402
 from app.models.spatial_segmenter import SpatialSegmenter  # noqa: E402
@@ -30,9 +31,10 @@ def main():
     ap.add_argument("tif")
     ap.add_argument("--kmin", type=int, default=2)
     ap.add_argument("--kmax", type=int, default=6)
+    ap.add_argument("--lote", help="poligono del lote (GeoJSON, shapefile o GeoPackage)")
     a = ap.parse_args()
 
-    p = RasterProcessor(a.tif).process()
+    p = RasterProcessor(a.tif, aoi=read_aoi(a.lote) if a.lote else None).process()
     X = StandardScaler().fit_transform(p.feature_stack).astype(np.float32)
     ndvi = p.feature_stack[:, 0]
     rng = np.random.default_rng(42)

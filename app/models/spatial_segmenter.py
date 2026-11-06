@@ -251,10 +251,11 @@ class SpatialSegmenter:
             n_zone, n_zone_transition = int(in_zone.sum()), int(zone_transition.sum())
             # con que otras zonas se mezclan los pixeles de transicion de esta zona
             partners, counts = np.unique(second_labels[zone_transition], return_counts=True)
-            mixes_with = {
-                str(int(p)): round(float(c * 100.0 / n_zone_transition), 2)
-                for p, c in sorted(zip(partners.tolist(), counts.tolist()), key=lambda pc: -pc[1])
-            }
+            mixes_with = {}
+            for p, c in sorted(zip(partners.tolist(), counts.tolist()), key=lambda pc: -pc[1]):
+                pct = round(c * 100.0 / n_zone_transition, 2)
+                if pct > 0:  # no listar mezclas de unos pocos pixeles que redondean a 0 %
+                    mixes_with[str(int(p))] = pct
             by_zone.append({
                 "cluster_id": zone.cluster_id,
                 "label": zone.label,

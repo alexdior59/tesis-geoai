@@ -1,11 +1,12 @@
 ============================================================
 RESUMEN - Motor GeoAI
 ============================================================
-Job ID       : 9afdccb5-1c04-48f9-b223-427b73221049
+Job ID       : 5f2cffe4-1a9d-4201-a470-be54b317bc9e
 Archivo      : palma_muestra.tif
 CRS          : EPSG:32618
 Resolucion   : 0.0607 m/px
 Area total   : 0.81 ha
+Lote         : sin poligono (toda la imagen)
 Bandas       : {'green': 1, 'red': 2, 'rededge': 3, 'nir': 4, 'alpha': 5}
 Pixeles val. : 2,082,234
 
@@ -50,4 +51,4 @@ Patrones     : 250
 Ruido        : 16.69%
 
 ============================================================
-Tiempo total: 7 s. Salidas en resultados_referencia\muestra
+Tiempo total: 8 s. Salidas en resultados_referencia\muestra

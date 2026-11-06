@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.models.accuracy import accuracy_assessment, blind_geojson, stratified_sample
+from app.models.aoi import aoi_to_dict, read_aoi
 from app.models.condition_report import ConditionReporter
 from app.models.crop_profiles import CROP_PROFILES, get_profile
 from app.models.explainability import ZoneExplainer
@@ -30,6 +31,7 @@ for _dir in (UPLOAD_DIR, REF_DIR, RESULTS_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
 
 MAX_FILE_MB = 2000
+MAX_AOI_MB = 20
 UPLOAD_CHUNK_BYTES = 16 * 1024 ** 2
 # Un ortomosaico completo ocupa varios GB de RAM mientras se procesa; por eso,
 # por defecto, corre un analisis a la vez y los demas esperan en cola.
@@ -61,6 +63,7 @@ class AnalysisParams(BaseModel):
     vegetation_threshold: float = Field(default=0.1, ge=-1, le=1)
     crop_type: str = "generico"
     reference_model_id: str | None = None
+    aoi: dict | None = None
 
 
 class AccuracyRequest(BaseModel):
@@ -94,11 +97,14 @@ async def analyze(
     dbscan_min_samples: int = Form(default=30, ge=5),
     vegetation_threshold: float = Form(default=0.1, ge=-1, le=1, description="NDVI minimo de vegetacion"),
     reference_model_id: str | None = Form(default=None),
+    aoi: UploadFile | None = File(
+        default=None, description="Poligono del lote en GeoJSON; los pixeles de afuera no se analizan"),
 ):
     """
     Calcula NDVI/NDRE/GNDVI, la condicion por rangos del cultivo, las zonas FCM,
     los patrones DBSCAN y, en palma, el analisis por palma. Con reference_model_id
-    se usan el k y el umbral de NDVI de la linea base y se genera el drift_report.
+    se usan el k, el umbral de NDVI y el poligono del lote de la linea base, y se
+    genera el drift_report.
     """
     filename = Path(file.filename or "").name
     if not filename.lower().endswith((".tif", ".tiff")):
@@ -125,9 +131,18 @@ async def analyze(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"El modelo de referencia es de cultivo '{ref['crop_type']}', no '{crop_type}'.",
             )
-        # Con otro umbral cambiarian los pixeles de vegetacion y el cambio por zona no seria comparable
+        if aoi is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Con una linea base se usa su mismo poligono del lote; no se envia otro.",
+            )
+        # Con otro umbral o con otra area cambiarian los pixeles analizados y el cambio
+        # por zona no seria comparable
         kmeans_k = int(ref["kmeans_k"])
         vegetation_threshold = float(ref.get("vegetation_threshold", vegetation_threshold))
+        aoi_dict = ref.get("aoi")
+    else:
+        aoi_dict = await _read_aoi_upload(aoi) if aoi is not None else None
 
     job_id = str(uuid.uuid4())
     tif_path = UPLOAD_DIR / f"{job_id}_{filename}"
@@ -140,6 +155,7 @@ async def analyze(
         vegetation_threshold=vegetation_threshold,
         crop_type=crop_type,
         reference_model_id=reference_model_id,
+        aoi=aoi_dict,
     )
     _register_job(job_id, filename, reference_model_id, crop_type)
     threading.Thread(target=_run_pipeline, args=(job_id, tif_path, params), daemon=True).start()
@@ -335,6 +351,7 @@ def create_reference_model(
         "scaler_scale": artifacts["scaler_scale"],
         "kmeans_k": artifacts["kmeans_k"],
         "vegetation_threshold": job["result_json"]["analysis_params"]["vegetation_threshold"],
+        "aoi": job.get("aoi"),
         "distance_p99": artifacts["distance_p99"],
         "feature_names": artifacts["feature_names"],
         "band_stats": job["result_json"].get("vegetation_indices", {}),
@@ -406,6 +423,19 @@ def health():
     }
 
 
+async def _read_aoi_upload(file: UploadFile):
+    data = await file.read(MAX_AOI_MB * 1024 ** 2 + 1)
+    if len(data) > MAX_AOI_MB * 1024 ** 2:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"El poligono del lote supera {MAX_AOI_MB} MB",
+        )
+    try:
+        return aoi_to_dict(read_aoi(data))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
+
+
 async def _save_upload(file: UploadFile, dest: Path):
     # Se escribe por bloques para no tener el ortomosaico completo en memoria.
     max_bytes = MAX_FILE_MB * 1024 ** 2
@@ -436,7 +466,8 @@ def _run_pipeline(job_id: str, tif_path: Path, params: AnalysisParams):
                 with _lock:
                     ref_model = _references.get(params.reference_model_id)
 
-            processed = RasterProcessor(tif_path, params.vegetation_threshold).process()
+            aoi = read_aoi(params.aoi) if params.aoi else None
+            processed = RasterProcessor(tif_path, params.vegetation_threshold, aoi=aoi).process()
 
             seg_result = SpatialSegmenter(
                 kmeans_k=params.kmeans_k,
@@ -472,6 +503,7 @@ def _run_pipeline(job_id: str, tif_path: Path, params: AnalysisParams):
                 extra_params={
                     "vegetation_threshold": params.vegetation_threshold,
                     "crop_type": params.crop_type,
+                    "poligono_lote": params.aoi is not None,
                 },
             )
             job_dir = RESULTS_DIR / job_id
@@ -498,6 +530,7 @@ def _run_pipeline(job_id: str, tif_path: Path, params: AnalysisParams):
                 accuracy_points=points,
                 accuracy_geojson=blind_geojson(points, processed.metadata.crs),
                 model_artifacts=seg_result.model_artifacts,
+                aoi=params.aoi,
             )
     except ValueError as e:
         _update_job(job_id, status="failed", error=str(e))

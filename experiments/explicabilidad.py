@@ -43,7 +43,7 @@ def main():
 
     print("\n3) TABLA DE ATRIBUTOS: pixeles reales")
     rows, cols = np.nonzero(p.valid_mask)
-    xs, ys = p.transform * (cols + 0.5, rows + 0.5)
+    xs, ys = p.transform @ (cols + 0.5, rows + 0.5)
     X = p.feature_stack
     Z = (X - mean) / scale
     u = r.max_membership

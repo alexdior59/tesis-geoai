@@ -20,7 +20,7 @@ La banda Alpha no es espectral: es una máscara de datos válidos (GDAL, s. f.).
 1. Ráster multibanda georreferenciado, resolución espacial (GSD) de 6 cm.
 2. Álgebra de mapas local: NDVI, NDRE y GNDVI se calculan celda por celda.
    NDVI = (NIR − R)/(NIR + R); NDRE = (NIR − RE)/(NIR + RE); GNDVI = (NIR − G)/(NIR + G).
-3. Máscara: se excluyen las celdas sin dato (Alpha y nodata) y las que no son vegetación (NDVI < 0.1).
+3. Máscara: se excluyen las celdas sin dato (Alpha y nodata), las que quedan fuera del polígono del lote cuando se entrega, y las que no son vegetación (NDVI < 0.1).
 4. De ráster a tabla: cada celda válida se vuelve una fila de la matriz de características.
 5. Estandarización de cada índice (puntaje z).
 6. Clasificación no supervisada por píxel con Fuzzy C-Means.
@@ -73,7 +73,7 @@ Con m → 1, FCM equivale a K-means. Se usa FCM porque la condición del cultivo
 Si dos centroides iniciales resultan ser el mismo valor (imágenes con muchos píxeles idénticos), FCM no los podría separar; en ese caso el arranque se toma entre valores distintos de la muestra. Con datos reales esto no ocurre y el resultado no cambia.
 
 ### 5.3 Línea base (modelo de referencia)
-Se guardan los centroides, el escalador, el umbral de NDVI, el percentil 99 de las distancias y las etiquetas del experto. Los vuelos siguientes se asignan al centroide congelado más cercano, la regla de asignación de K-means, sin reentrenar, y usan el mismo k y el mismo umbral de NDVI de la línea base para que la vegetación analizada sea comparable. Un reajuste de FCM iniciado desde la línea base se usa solo para medir el desplazamiento de los centroides. El cambio se reporta por número de zona.
+Se guardan los centroides, el escalador, el umbral de NDVI, el polígono del lote, el percentil 99 de las distancias y las etiquetas del experto. Los vuelos siguientes se asignan al centroide congelado más cercano, la regla de asignación de K-means, sin reentrenar, y usan el mismo k, el mismo umbral de NDVI y el mismo polígono de la línea base para que el área y la vegetación analizadas sean comparables. Un reajuste de FCM iniciado desde la línea base se usa solo para medir el desplazamiento de los centroides. El cambio se reporta por número de zona.
 
 ### 5.4 DBSCAN
 Agrupa por coordenadas en metros (radio de 0.5 m, mínimo 30 puntos) el 5 % de píxeles más alejados de su centroide, para encontrar parches espaciales atípicos. Si ese 5 % supera 200 000 píxeles, se conservan los 200 000 más alejados en lugar de una muestra al azar, para no romper la densidad de los parches. Cada patrón se entrega como un polígono.
@@ -121,27 +121,29 @@ Escala de NDVI del codirector (Acta N.° 01, 17/10/2026): mayor a 0.6, buena con
 
 ## 9. Resultados en el lote de palma
 
-Los archivos completos están en `resultados_referencia/` y se reproducen con los scripts de `experiments/`. Los resultados del lote completo se obtuvieron con la v1.2; la v1.3 asigna cada píxel a la misma zona, y las áreas solo cambian desde el cuarto decimal porque ahora se calculan con la resolución sin redondear.
+Los archivos completos están en `resultados_referencia/` y se reproducen con los scripts de `experiments/`. El análisis completo y los mapas del lote se repitieron con la v1.3; los demás experimentos del lote completo son de la v1.2. La v1.3 asigna cada píxel a la misma zona, y las áreas solo cambian desde el cuarto decimal porque ahora se calculan con la resolución sin redondear.
 
 | Aspecto | Resultado |
 |---|---|
 | Condición por rangos | 96.85 % del área con NDVI > 0.6; 0.75 % en transición; 2.24 % en estrés (0.54 ha, 14 zonas de inspección); 0.16 % suelo o senescencia |
 | Zonas FCM (k = 4) | Prototipos: NDVI 0.886 / 0.856 / 0.792 / 0.283 y NDRE 0.369 / 0.310 / 0.268 / 0.118. Silhouette 0.345, Davies-Bouldin 0.812, FPC 0.624 |
-| Número de zonas | FPI y entropía mínimos en k = 3 (0.400 y 0.407); el lote de plátano coincide (0.371 y 0.406) |
+| Número de zonas | Sobre toda la imagen, FPI y entropía mínimos en k = 3 (0.400 y 0.407); el lote de plátano coincide (0.371 y 0.406). Con el polígono aproximado del lote de palma no hay un mínimo común: FPI en k = 2 (0.511) y entropía en k = 4 (0.532) |
 | Línea base | 0.0 % de cambio falso en la mitad sin cambio frente a 34.2 % al reajustar los centroides; 64.9 % de la mitad estresada baja de zona |
 | Importancia por permutación | NDRE 42.8 %, GNDVI 28.0 %, NDVI 16.6 % |
 | Árbol sustituto | Fidelidad del 89.9 %, con reglas basadas en NDRE y GNDVI |
 | Incertidumbre | Pertenencia máxima media 0.74; 23.8 % de píxeles de transición |
-| Transición por zona (muestra de 90 × 90 m, k = 4) | 15.1 % de píxeles en transición: 28.9 % de la zona 0, 23.0 % de la zona 1, 13.2 % de la zona 3 y 1.7 % de la zona de estrés. Las zonas se mezclan en cadena: la 3 con la 1, la 1 con la 0 y la 0 con la 2. Con k = 3 la transición baja a 7.1 % |
+| Transición por zona (k = 4) | 23.8 % de píxeles en transición: 27.3 % de la zona 0, 25.8 % de la zona 1, 18.4 % de la zona 2 y 11.9 % de la zona de estrés. Las zonas se mezclan en cadena: la 2 con la 1, la 1 con la 0 y la 0 con la de estrés. En la muestra de 90 × 90 m, con k = 3 la transición baja de 15.1 % a 7.1 % |
 | Escala | Palma (k = 4): Silhouette 0.345 por píxel, 0.356 a 1 m y 0.358 a 2 m. Plátano (k = 3): 0.502, 0.601 y 0.619 |
 | Por palma | 3 067 palmas, 146.3/ha frente a 142.6 esperadas; 23 a inspeccionar; 363 copas débiles; 161 posibles faltantes |
 | Contraste con la escala | 116 de 120 puntos y 36 de 36 polígonos en el rango de su zona; las zonas 0, 1 y 2 quedan las tres en "buena condición" |
 
 ### Interpretación
 
-- El índice que más pesa es el NDRE. Las zonas de palma se separan sobre todo por el borde rojo y no por el NDVI. Es coherente con la saturación del NDVI en dosel denso (Mutanga & Skidmore, 2004; Vera-Esmeraldas et al., 2025) y con el criterio del codirector. Tres de las cuatro zonas subdividen el rango de buena condición, y la selección de k indica que tres zonas describen mejor el lote.
+- El índice que más pesa es el NDRE. Las zonas de palma se separan sobre todo por el borde rojo y no por el NDVI. Es coherente con la saturación del NDVI en dosel denso (Mutanga & Skidmore, 2004; Vera-Esmeraldas et al., 2025) y con el criterio del codirector. Tres de las cuatro zonas subdividen el rango de buena condición.
 - La escala pesa según el tipo de dosel. En la palma, de dosel cerrado, agregar los píxeles casi no cambia la estructura. En el plátano, con más suelo y sombra entre plantas, la agregación mejora claramente la separación. Esto muestra que la unidad de análisis debe elegirse según el cultivo.
-- La zona de estrés es la mejor definida. Menos del 2 % de sus píxeles está en transición, frente a más del 20 % en las subzonas de buena condición, que se mezclan entre sí en cadena. Es otra señal de que las subzonas por encima de NDVI 0.6 son un gradiente y no condiciones separadas, y de que tres zonas describen mejor el lote.
+- La zona de estrés es la mejor definida. El 11.9 % de sus píxeles está en transición, frente a 18 % a 27 % en las subzonas de buena condición, que se mezclan entre sí en cadena. Es otra señal de que las subzonas por encima de NDVI 0.6 son un gradiente y no condiciones separadas.
+- La zona de estrés no es palma estresada. El mapa de zonas (`resultados_referencia/mapas_palma/`) muestra que el 89 % de sus píxeles está en una franja sin palma del borde este del ortomosaico, y el resto en las vías internas. La mayor de las 14 zonas de inspección es esa franja: 0.45 ha, el 90 % del área de inspección. Sin recortar con el polígono del lote, el 2.24 % "en estrés" debe leerse como área con NDVI entre 0.2 y 0.5, no como palmas afectadas. Las palmas con NDVI bajo se identifican mejor en el análisis por palma (23 a inspeccionar). Con un polígono aproximado del lote (envolvente de las palmas detectadas) ya no aparece una zona de estrés y el área en NDVI 0.2–0.5 baja de 2.24 % a 0.93 %.
+- El número de zonas dependía de la franja sin palma. Sobre toda la imagen los índices de FCM señalaban k = 3, pero la tercera zona era esa franja; dentro del lote los índices no coinciden (FPI en k = 2, entropía en k = 4). Dentro de la plantación el vigor es un gradiente sin grupos marcados, así que k debe decidirse por la utilidad agronómica de las zonas, con el experto, y no solo por los índices.
 - El experto no se puede omitir. El 23.8 % de píxeles de transición confirma que las fronteras entre zonas son graduales, lo que justifica FCM y la validación experta. Además, al aplicar la escala del codirector a la reflectancia, 35 de los 36 polígonos grandes quedan en "buena condición": la regla de umbrales confirma la zona de estrés, pero no separa las zonas 0, 1 y 2 ni distingue palma de pasto o arvenses, que también superan 0.6. Llenar los formatos de validación con esa regla sería comparar el modelo consigo mismo; qué cobertura hay en cada zona solo lo establece el experto.
 
 ## 10. Limitaciones y trabajo futuro
@@ -149,7 +151,7 @@ Los archivos completos están en `resultados_referencia/` y se reproducen con lo
 - No hay dos vuelos del mismo lote: la línea base se valida con un vuelo simulado.
 - La exactitud temática y la pureza por zona dependen de la verificación del experto, pendiente.
 - El conteo de palmas no se ha comparado con un conteo en campo; arbustos de linderos y vías internas generan falsos positivos conocidos.
-- Los porcentajes se calculan sobre el área con datos de la imagen; falta recortar con el polígono del lote.
+- Falta el polígono oficial del lote PALMA. El recorte está implementado, pero sin ese polígono los porcentajes se calculan sobre toda el área con datos de la imagen, y la zona de estrés y la mayor zona de inspección quedan fuera de la plantación.
 - Sin banda azul no se calcula EVI; el EVI2 (Jiang et al., 2008) requiere confirmar la escala de reflectancia. Sin infrarrojo de onda corta, el estrés hídrico solo se infiere (Gao, 1996).
 - Por encima de NDVI 0.6, las subzonas requieren calibración con datos de campo.
 - FCM no incorpora la vecindad espacial; las variantes espaciales de FCM (Ahmed et al., 2002) quedan como trabajo futuro, junto con el aprendizaje a partir de la retroalimentación del usuario.

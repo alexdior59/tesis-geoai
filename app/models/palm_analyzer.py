@@ -249,7 +249,7 @@ class PalmAnalyzer:
 
     @staticmethod
     def _to_utm(transform, rows, cols, f):
-        return transform * (np.asarray(cols) * f + f / 2.0, np.asarray(rows) * f + f / 2.0)
+        return transform @ (np.asarray(cols) * f + f / 2.0, np.asarray(rows) * f + f / 2.0)
 
     @staticmethod
     def _to_wgs84(crs, xs, ys):

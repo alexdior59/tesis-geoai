@@ -84,7 +84,7 @@ class ConditionReporter:
         counts = np.bincount(labels.ravel(), minlength=n + 1)[1:]
         ndvi_means = ndimage.mean(np.nan_to_num(ndvi), labels, idx)
         centers = np.array(ndimage.center_of_mass(mask, labels, idx))
-        xs, ys = transform * (centers[:, 1] + 0.5, centers[:, 0] + 0.5)
+        xs, ys = transform @ (centers[:, 1] + 0.5, centers[:, 0] + 0.5)
         lons, lats = warp_transform(crs, "EPSG:4326", list(xs), list(ys))
 
         order = np.argsort(-counts)

@@ -27,6 +27,7 @@ geoai-engine-main/
 │   │   └── analyze_router.py   Endpoints, trabajos asíncronos y líneas base persistentes
 │   ├── models/
 │   │   ├── raster_processor.py Lectura del GeoTIFF, bandas por nombre, NDVI, NDRE y GNDVI
+│   │   ├── aoi.py              Polígono del lote: lectura, validación y recorte
 │   │   ├── spatial_segmenter.py FCM, transición entre zonas, DBSCAN, métricas y comparación con la línea base
 │   │   ├── condition_report.py Rangos de NDVI del experto y zonas de inspección
 │   │   ├── palm_analyzer.py    Conteo y análisis por palma
@@ -35,11 +36,11 @@ geoai-engine-main/
 │   │   └── crop_profiles.py    Escala de NDVI por cultivo y su fuente
 │   └── views/
 │       └── response_serializer.py JSON, GeoJSON, resumen en texto y GeoTIFF
-├── tests/                      71 pruebas automáticas con imágenes sintéticas
-├── experiments/                Experimentos reproducibles con ortomosaicos reales
+├── tests/                      79 pruebas automáticas con imágenes sintéticas
+├── experiments/                Experimentos reproducibles y mapas en PNG
 ├── sample_data/
 │   └── palma_muestra.tif       Recorte de 90 × 90 m del lote de palma (28 MB)
-├── resultados_referencia/      Salidas obtenidas al correr pruebas y experimentos
+├── resultados_referencia/      Salidas de las pruebas y los experimentos, con los mapas del lote
 ├── METODOLOGIA.md              Método, validez, explicabilidad, glosario y referencias
 ├── CAMBIOS_v1_2.md             Cambios de la v1.2 y sus pruebas
 ├── CAMBIOS_v1_3.md             Cambios de la v1.3 y sus pruebas
@@ -74,7 +75,7 @@ python -m pip install -r requirements-dev.txt
 python -m pytest -v
 ```
 
-Resultado esperado: 71 passed en uno o dos minutos. El reporte obtenido está en `resultados_referencia/pruebas_pytest.txt`.
+Resultado esperado: 79 passed en uno o dos minutos. El reporte obtenido está en `resultados_referencia/pruebas_pytest.txt`.
 
 Las pruebas no necesitan los ortomosaicos reales. Cada una genera una imagen sintética con la misma estructura que exporta Pix4Dfields (5 bandas float32: Green, Red, Red edge, NIR y Alpha; nodata −10000; EPSG:32618), con valores de NDVI, NDRE y GNDVI conocidos, para comparar el resultado con la respuesta correcta. Los generadores están en `tests/conftest.py`.
 
@@ -89,6 +90,8 @@ Las pruebas no necesitan los ortomosaicos reales. Cada una genera una imagen sin
 | `test_explainability.py` | Pertenencia FCM; la explicación local suma exactamente la decisión; la importancia por permutación identifica el único índice informativo; fidelidad del árbol sustituto; prototipos en unidades originales. |
 | `test_accuracy.py` | Matriz de confusión, exactitudes y Kappa contra valores calculados a mano; muestreo estratificado (puntos por zona, distancia mínima, reproducible); puntos a ciegas sin la zona del modelo. |
 | `test_api.py` | Flujo completo por HTTP: validaciones de entrada, análisis genérico y de palma, todos los endpoints de resultado, explicabilidad, descarga del mapa de incertidumbre, exactitud temática, creación de la línea base con etiquetas, persistencia tras reiniciar y comparación contra la línea base. |
+| `test_lote.py` | Fuera del polígono del lote los píxeles quedan sin dato; el polígono en otro sistema de coordenadas se reproyecta; un polígono que no se cruza con la imagen o un archivo sin polígonos dan error; por la API, el lote cambia los porcentajes, queda en la línea base y el vuelo siguiente lo usa. |
+| `test_mapas.py` | El análisis completo y los cinco mapas en PNG se generan sobre la plantación sintética, también con el polígono del lote. |
 | `test_robustez.py` | Banda Alpha detectada por *color interpretation*; "Near infrared" no se confunde con rojo; el `job_id` del resultado es el de la API; el umbral de NDVI queda registrado y la línea base lo impone; área real de cada polígono; patrones DBSCAN en GeoJSON; respuesta 409 mientras el análisis no termina; nombres de archivo con rutas. |
 
 ## 4. Probar la API con la imagen de muestra
@@ -106,6 +109,14 @@ Con línea de comandos:
 ```bash
 curl -F "file=@sample_data/palma_muestra.tif" -F "crop_type=palma" http://127.0.0.1:8000/api/v1/analyze
 ```
+
+Conviene enviar también el polígono del lote, para que solo se analice el área sembrada. Se dibuja en QGIS y se exporta como GeoJSON; puede estar en cualquier sistema de coordenadas:
+
+```bash
+curl -F "file=@sample_data/palma_muestra.tif" -F "aoi=@lote.geojson" -F "crop_type=palma" http://127.0.0.1:8000/api/v1/analyze
+```
+
+Los píxeles de afuera quedan sin dato: no cuentan en los rangos de NDVI, las zonas, las palmas ni los puntos de verificación. El área del lote sale en `data_provenance.lote_area_ha`.
 
 La respuesta trae un `job_id`. Con él:
 
@@ -157,7 +168,7 @@ curl -F "name=PALMA vuelo base" -F "validated_by=Codirector" -F "zone_labels={\"
 curl -F "file=@vuelo_nuevo.tif" -F "crop_type=palma" -F "reference_model_id=REFERENCE_ID" http://127.0.0.1:8000/api/v1/analyze
 ```
 
-Con una línea base, el análisis usa el k y el umbral de NDVI de la línea base, aunque se envíen otros, para que los dos vuelos se comparen sobre los mismos píxeles de vegetación y las mismas zonas.
+Con una línea base, el análisis usa el k, el umbral de NDVI y el polígono del lote de la línea base, aunque se envíen otros k o umbral, para que los dos vuelos se comparen sobre la misma área y las mismas zonas. Si se envía otro polígono junto con la línea base, la API responde 422.
 
 El resultado incluye `drift_report`, con el cambio de área de cada zona (por número de zona y con el nombre del experto) y el desplazamiento de los centroides. Las líneas base se guardan como JSON en `data/references/` (o en la carpeta indicada en `GEOAI_REF_DIR`) y se recargan al reiniciar el servidor.
 
@@ -167,12 +178,13 @@ Necesitan el ortomosaico completo (`Ortomosaico.data.tif`, 1 a 1,5 GB), que no s
 
 | Script | Qué mide | Resultado guardado |
 |---|---|---|
-| `experiments/analisis_completo.py` | El pipeline completo sin la API, con todas las salidas (también el mapa de transición y los patrones DBSCAN) | `palma_resumen.txt`, `muestra/` |
+| `experiments/analisis_completo.py` | El pipeline completo sin la API, con todas las salidas (también el mapa de transición y los patrones DBSCAN). Con `--lote` recorta con el polígono del lote | `palma_resumen.txt`, `muestra/` |
 | `experiments/linea_base_estres.py` | Línea base: cambio falso y detección con estrés simulado | `linea_base_estres_palma.txt` |
-| `experiments/seleccion_k.py` | Número de zonas con FPI, entropía, FPC, Silhouette y Davies-Bouldin | `seleccion_k_palma.txt`, `seleccion_k_platano.txt` |
+| `experiments/seleccion_k.py` | Número de zonas con FPI, entropía, FPC, Silhouette y Davies-Bouldin (acepta `--lote`) | `seleccion_k_palma.txt`, `seleccion_k_platano.txt` |
 | `experiments/sensibilidad_escala.py` | Efecto de la unidad de análisis (píxel, 0,5, 1 y 2 m) | `sensibilidad_escala_palma.txt`, `sensibilidad_escala_platano.txt` |
 | `experiments/explicabilidad.py` | Tabla de atributos de píxeles reales, prototipos, permutación, explicación local y árbol de reglas | `explicabilidad_palma.txt` |
 | `experiments/exactitud_tematica.py` | `formulario`: Excel a ciegas con los puntos de verificación. `evaluar`: matriz de confusión con el Excel diligenciado | `muestra/verificacion_exactitud.xlsx` |
+| `experiments/mapas.py` | Mapas en PNG a partir de la carpeta de `analisis_completo.py`: zonas FCM, transición, incertidumbre, zonas de inspección con patrones DBSCAN y estado de cada palma | `mapas_palma/`, `muestra/mapas/` |
 | `experiments/contraste_escala_experto.py` | La escala de NDVI del codirector aplicada a la reflectancia de cada punto y polígono, frente al rango que el modelo le dio a cada zona (consistencia interna, no reemplaza al experto) | `contraste_escala_palma.txt`, `muestra/contraste_escala_experto.xlsx` |
 
 Ejemplo:
@@ -181,22 +193,50 @@ Ejemplo:
 python experiments/seleccion_k.py ruta/al/Ortomosaico.data.tif
 ```
 
+### Mapas
+
+Los mapas se generan a partir de la carpeta de `analisis_completo.py`. Con `--tif`, las zonas de inspección y las palmas se dibujan sobre el ortomosaico en falso color (NIR, rojo, verde). Si el análisis se hizo con `--lote`, se dibuja su límite y los mapas se encuadran en él.
+
+```bash
+python experiments/analisis_completo.py ruta/al/Ortomosaico.data.tif salida_palma --cultivo palma --lote lote.geojson
+```
+
+```bash
+python experiments/mapas.py salida_palma --tif ruta/al/Ortomosaico.data.tif
+```
+
+| Mapa | Qué muestra |
+|---|---|
+| `01_zonas_fcm.png` | Zonas FCM coloreadas de mayor a menor NDVI, con su rango de la escala del codirector y el porcentaje del área |
+| `02_transicion.png` | Las mismas zonas con los píxeles de transición en gris |
+| `03_incertidumbre.png` | Pertenencia de cada píxel a su zona, en porcentaje |
+| `04_inspeccion_y_patrones.png` | Zonas de inspección (NDVI 0,2–0,5) y patrones DBSCAN sobre el ortomosaico |
+| `05_palmas.png` | Cada palma con su estado: normal, copa débil, a inspeccionar o posible faltante |
+
+Los mapas del lote completo están en `resultados_referencia/mapas_palma/` y los de la muestra en `resultados_referencia/muestra/mapas/`.
+
+![Zonas FCM del lote de palma](resultados_referencia/mapas_palma/01_zonas_fcm.png)
+
+![Estado de cada palma](resultados_referencia/mapas_palma/05_palmas.png)
+
 ### Resultados obtenidos (lote de palma, Meta, abril de 2025, 6 cm/píxel)
 
-Los resultados del lote completo se obtuvieron con la v1.2. La v1.3 asigna cada píxel a la misma zona; las áreas solo cambian desde el cuarto decimal, porque ahora se calculan con la resolución sin redondear.
+El análisis completo y los mapas del lote se repitieron con la v1.3; los demás experimentos del lote completo son de la v1.2. La v1.3 asigna cada píxel a la misma zona; las áreas solo cambian desde el cuarto decimal, porque ahora se calculan con la resolución sin redondear.
 
 | Medida | Resultado | Archivo en `resultados_referencia/` |
 |---|---|---|
-| Condición por rangos del experto | 96,85 % con NDVI > 0,6; 0,75 % en transición; 2,24 % en estrés (0,54 ha en 14 zonas de inspección); 0,16 % suelo | `palma_resumen.txt` |
+| Condición por rangos del experto | 96,85 % con NDVI > 0,6; 0,75 % en transición; 2,24 % en estrés (0,54 ha en 14 zonas de inspección); 0,16 % suelo. El 90 % del área de inspección es una sola franja sin palma del borde este, y el resto son sobre todo vías internas (ver `mapas_palma/04_inspeccion_y_patrones.png`) | `palma_resumen.txt` |
 | Zonificación FCM (k = 4) | Silhouette 0,345; Davies-Bouldin 0,812; FPC 0,624 (sin estructura sería 0,25) | `palma_resumen.txt` |
-| Número de zonas | FPI y entropía con mínimo en k = 3 en los dos lotes (palma: 0,400 y 0,407; plátano: 0,371 y 0,406); con k = 3 se conserva la zona de estrés | `seleccion_k_*.txt` |
+| Número de zonas | Sobre toda la imagen, FPI y entropía con mínimo en k = 3 en los dos lotes (palma: 0,400 y 0,407; plátano: 0,371 y 0,406). En palma, con el polígono aproximado del lote ese mínimo desaparece (FPI en k = 2, entropía en k = 4): la tercera zona era la franja sin palma | `seleccion_k_*.txt`, `lote_aproximado/` |
 | Línea base | Mismo vuelo: 100 % de coincidencia. Estrés simulado en la mitad del lote: 0,0 % de cambio falso en la mitad sin cambio (34,2 % con la versión anterior) y 64,9 % de la mitad estresada baja de zona | `linea_base_estres_palma.txt` |
 | Explicabilidad | Al desordenar NDRE cambia de zona el 42,8 % de los píxeles; GNDVI 28,0 %; NDVI 16,6 %. Árbol sustituto con fidelidad del 89,9 %. 23,8 % de píxeles de transición | `explicabilidad_palma.txt` |
-| Transición entre zonas (muestra de 90 × 90 m) | Con k = 4, 15,1 % de los píxeles en transición: 28,9 % de la zona 0 y 23,0 % de la zona 1, frente a 1,7 % de la zona de estrés. Las zonas se mezclan en cadena: la 3 con la 1, la 1 con la 0 y la 0 con la de estrés. Con k = 3 la transición baja a 7,1 % | `muestra/resumen.txt` |
+| Transición entre zonas | 23,8 % de los píxeles: 27,3 % de la zona 0, 25,8 % de la zona 1, 18,4 % de la zona 2 y 11,9 % de la zona de estrés. Las zonas se mezclan en cadena (2 con 1, 1 con 0, 0 con la de estrés). En la muestra, con k = 3 la transición baja de 15,1 % a 7,1 % | `palma_resumen.txt`, `mapas_palma/02_transicion.png` |
 | Escala (MAUP) | Palma: con k = 4, Silhouette 0,345 por píxel y 0,358 con celdas de 2 m. Plátano: con k = 3, 0,502 por píxel y 0,619 con celdas de 2 m | `sensibilidad_escala_*.txt` |
 | Análisis por palma | 3.067 palmas, 146,3/ha (142,6 esperadas a 9 m en triángulo); 23 a inspeccionar por NDVI; 363 copas débiles; 161 posibles faltantes | `palma_resumen.txt` |
 | Contraste con la escala del codirector | 116 de 120 puntos y 36 de 36 polígonos caen en el rango que el modelo le dio a su zona. Las zonas 0, 1 y 2 quedan las tres en "buena condición": la escala no las separa (las separa NDRE) ni dice qué cobertura hay | `contraste_escala_palma.txt` |
 | Exactitud temática | 120 puntos estratificados (30 por zona) listos para la verificación del experto | Formato en la carpeta de documentos de la entrega |
+| Con el polígono aproximado del lote (22,7 ha) | NDVI 0,2–0,5 baja de 2,24 % a 0,93 % (0,21 ha); ya no hay zona FCM de estrés: la de menor NDVI (0,57) son vías y bordes de copa; 3.053 palmas; 91 patrones DBSCAN en lugar de 1.075 | `lote_aproximado/` |
+| Tiempo y memoria (API, lote completo de 1,5 GB) | Subida en 5 s con 0,2 GB de memoria; análisis completo en 184 s con un pico de 5,4 GB en el servidor (Windows 11, 23 GB de RAM). El GeoJSON de zonas pesa 50 MB | — |
 
 ## 7. Docker
 
@@ -211,8 +251,8 @@ La API queda en <http://localhost:8000/docs>; las líneas base se guardan en `./
 - No hay todavía dos vuelos del mismo lote. La línea base se valida con un vuelo simulado (estrés controlado); falta un segundo vuelo real.
 - La interpretación de las zonas por el experto (pureza por zona) y la exactitud temática con los 120 puntos de verificación están pendientes; los formatos están listos.
 - El conteo de palmas no se ha comparado con un conteo en campo. Arbustos en linderos pueden contarse como palmas y vías internas pueden aparecer como posibles faltantes.
-- Los porcentajes se calculan sobre el área con datos de la imagen; no se recorta todavía con el polígono del lote.
+- Falta el polígono oficial del lote PALMA. Sin él, los porcentajes se calculan sobre toda el área con datos de la imagen, y en PALMA la zona FCM de estrés y la mayor zona de inspección quedan en una franja sin palma del borde este y en las vías: el 2,24 % en estrés no corresponde a palmas afectadas. El recorte ya está implementado (`aoi` en la API, `--lote` en los experimentos).
 - El Mavic 3M no tiene banda azul ni infrarrojo de onda corta: no se calcula EVI y el estrés hídrico solo se infiere.
 - Por encima de NDVI 0,6, las subzonas requieren calibración con datos de campo.
 - Los trabajos de análisis se guardan en memoria; se pierden si el servidor se reinicia (las líneas base sí persisten).
-- Los experimentos con el ortomosaico completo no se han repetido con la v1.3, y el tiempo y la memoria de un análisis completo por la API no se han medido.
+- La selección de k, la línea base, la explicabilidad y la escala del lote completo no se han repetido con la v1.3 (el análisis completo y los mapas sí).

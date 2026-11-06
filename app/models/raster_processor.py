@@ -6,6 +6,8 @@ import rasterio
 from rasterio.crs import CRS
 from rasterio.enums import ColorInterp
 
+from app.models.aoi import aoi_area_ha, aoi_mask
+
 # Orden en que Pix4Dfields exporta el Mavic 3M cuando el tif no trae nombres de banda
 DEFAULT_MAVIC3M_BANDS = {
     "green": 1,
@@ -31,6 +33,7 @@ class RasterMetadata:
     dtype: str
     source_software: str
     capture_datetime: str
+    aoi_area_ha: float | None = None
 
 
 @dataclass
@@ -47,12 +50,16 @@ class ProcessedRaster:
 
 
 class RasterProcessor:
-    """Lee el ortomosaico del Mavic 3M y calcula NDVI, NDRE y GNDVI."""
+    """
+    Lee el ortomosaico del Mavic 3M y calcula NDVI, NDRE y GNDVI. Con el poligono del lote
+    (GeoDataFrame de app.models.aoi), los pixeles de afuera quedan sin dato.
+    """
 
     VEGETATION_THRESHOLD = 0.1
 
-    def __init__(self, tif_path, vegetation_threshold=None):
+    def __init__(self, tif_path, vegetation_threshold=None, aoi=None):
         self.path = Path(tif_path)
+        self.aoi = aoi
         if vegetation_threshold is not None:
             self.VEGETATION_THRESHOLD = vegetation_threshold
         if not self.path.exists():
@@ -67,6 +74,8 @@ class RasterProcessor:
             metadata = self._extract_metadata(ds, band_map)
             transform = ds.transform
             bands = self._load_bands(ds, band_map)
+            if self.aoi is not None:
+                self._apply_aoi(ds, bands, metadata)
 
         indices = self._calculate_indices(bands)
         valid_mask = self._build_valid_mask(bands, indices)
@@ -179,6 +188,14 @@ class RasterProcessor:
             for name in bands:
                 bands[name] /= divisor
         return bands
+
+    def _apply_aoi(self, ds, bands, metadata):
+        inside = aoi_mask(self.aoi, ds.crs, ds.transform, (ds.height, ds.width))
+        if not (inside & ~np.isnan(bands["nir"])).any():
+            raise ValueError("El poligono del lote no se cruza con el area con datos del ortomosaico.")
+        for name in bands:
+            bands[name][~inside] = np.nan
+        metadata.aoi_area_ha = round(aoi_area_ha(self.aoi, ds.crs), 4)
 
     def _calculate_indices(self, bands):
         nir = bands["nir"]

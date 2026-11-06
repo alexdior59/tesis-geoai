@@ -44,7 +44,7 @@ def stratified_sample(processed, labels, n_per_zone=30, min_distance_m=10.0, mmu
         return []
     rows = np.array([p["fila"] for p in puntos])
     cols = np.array([p["columna"] for p in puntos])
-    xs, ys = processed.transform * (cols + 0.5, rows + 0.5)
+    xs, ys = processed.transform @ (cols + 0.5, rows + 0.5)
     lons, lats = warp_transform(processed.metadata.crs, "EPSG:4326", list(xs), list(ys))
     orden = rng.permutation(len(puntos))
     salida = []

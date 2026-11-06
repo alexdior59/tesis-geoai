@@ -47,6 +47,7 @@ class ResponseSerializer:
                 "crs": m.crs,
                 "resolution_m": m.resolution_m,
                 "area_ha": m.area_ha,
+                "lote_area_ha": m.aoi_area_ha,
                 "image_size_px": f"{m.width_px} x {m.height_px}",
                 "band_count": m.band_count,
                 "band_mapping": m.band_mapping,
@@ -184,6 +185,7 @@ class ResponseSerializer:
             f"CRS          : {m.crs}",
             f"Resolucion   : {m.resolution_m} m/px",
             f"Area total   : {m.area_ha} ha",
+            f"Lote         : {m.aoi_area_ha} ha (poligono del lote)" if m.aoi_area_ha else "Lote         : sin poligono (toda la imagen)",
             f"Bandas       : {m.band_mapping}",
             f"Pixeles val. : {r.params.get('n_valid_pixels', 0):,}",
         ]

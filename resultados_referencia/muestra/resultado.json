@@ -1,13 +1,14 @@
 {
-  "job_id": "9afdccb5-1c04-48f9-b223-427b73221049",
+  "job_id": "5f2cffe4-1a9d-4201-a470-be54b317bc9e",
   "api_version": "1.3.0",
-  "timestamp_utc": "2026-10-31T18:55:33.916896+00:00",
+  "timestamp_utc": "2026-11-06T11:55:37.751926+00:00",
   "status": "completed",
   "data_provenance": {
     "source_file": "palma_muestra.tif",
     "crs": "EPSG:32618",
     "resolution_m": 0.0607,
     "area_ha": 0.81,
+    "lote_area_ha": null,
     "image_size_px": "1483 x 1483",
     "band_count": 5,
     "band_mapping": {
@@ -34,7 +35,8 @@
     "reference_model_id": null,
     "classification_mode": "fcm_libre",
     "crop_type": "palma",
-    "vegetation_threshold": 0.1
+    "vegetation_threshold": 0.1,
+    "poligono_lote": false
   },
   "condicion_por_rangos": {
     "cultivo": "palma",

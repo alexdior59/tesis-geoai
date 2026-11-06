@@ -1,0 +1,55 @@
+============================================================
+RESUMEN - Motor GeoAI
+============================================================
+Job ID       : 9f4d768a-98ce-4d5c-8249-b36aca164795
+Archivo      : Ortomosaico.data.tif
+CRS          : EPSG:32618
+Resolucion   : 0.0607 m/px
+Area total   : 33.4407 ha
+Lote         : 22.7156 ha (poligono del lote)
+Bandas       : {'green': 1, 'red': 2, 'rededge': 3, 'nir': 4, 'alpha': 5}
+Pixeles val. : 60,797,158
+
+--- CONDICION POR RANGOS DE NDVI (Palma de aceite) ---
+Area con datos: 22.4008 ha
+  NDVI -1.00 a 0.20  Suelo desnudo o cultivo en senescencia tot    0.003 ha    0.01%
+  NDVI  0.20 a 0.50  Cultivo con estres: zona de inspeccion        0.207 ha    0.93%
+  NDVI  0.50 a 0.60  Transicion entre estres y buena condicion     0.178 ha    0.79%
+  NDVI  0.60 a 1.00  Vegetacion en buena condicion (subrangos r   22.013 ha   98.27%
+Inspeccion   : 0.93% del area (0.2074 ha) en NDVI 0.2-0.5; 13 zonas >= 10.0 m2
+
+--- ANALISIS POR PALMA ---
+Palmas       : 3,053  (146.1 palmas/ha; esperado 142.6)
+A inspeccionar (NDVI): 22 (0.72%)
+Copa debil (verificar): 374 (12.25%)
+Posibles faltantes: 164
+
+--- MACRO-ZONIFICACION (FCM) ---
+Clusters     : 4
+Silhouette   : 0.3326  (estructura debil)
+Davies-Bould.: 0.9097
+FPC (Bezdek) : 0.6002  (1/k = sin estructura, 1 = nitida)
+  [0] zona_buena_condicion_0            5.6222 ha  NDVI=0.891  NDRE=0.377  Desv=0.277
+  [1] zona_buena_condicion_1            9.4360 ha  NDVI=0.863  NDRE=0.315  Desv=0.226
+  [3] zona_buena_condicion_3            6.4567 ha  NDVI=0.806  NDRE=0.274  Desv=0.301
+  [2] zona_transicion_2                 0.8762 ha  NDVI=0.574  NDRE=0.235  Desv=0.606
+
+--- TRANSICION ENTRE ZONAS (pertenencia < 0.6) ---
+Pixeles      : 27.27% (6.1056 ha)
+  [0]  20.30% en transicion; se mezcla con: zona 1 100.0%
+  [1]  28.30% en transicion; se mezcla con: zona 3 53.37%, zona 0 46.63%
+  [3]  30.11% en transicion; se mezcla con: zona 1 76.75%, zona 2 23.25%
+  [2]  39.91% en transicion; se mezcla con: zona 3 100.0%
+
+--- EXPLICABILIDAD ---
+Importancia (% de pixeles que cambian de zona al desordenar el indice): NDVI 20.15%, NDRE 39.49%, GNDVI 31.59%
+Arbol sustituto (profundidad 3): fidelidad 88.26%
+Incertidumbre: pertenencia maxima media 0.717; 27.27% de pixeles de transicion (pertenencia < 0.6)
+
+--- PATRONES ESPACIALES ATIPICOS (DBSCAN) ---
+Patrones     : 91
+Ruido        : 1.71%
+
+============================================================
+Tiempo total: 149 s (analisis_completo.py con --lote, v1.3).
+Poligono aproximado: envolvente de las palmas detectadas + 4,5 m. No es el limite oficial del lote.
